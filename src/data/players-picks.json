@@ -1,0 +1,10 @@
+{
+  "assets": [
+    { "id": "pick_2026_early_1", "kind": "pick", "name": "2026 Early 1st", "position": null, "team": null, "value": 4800 },
+    { "id": "pick_2026_mid_1", "kind": "pick", "name": "2026 Mid 1st", "position": null, "team": null, "value": 3800 },
+    { "id": "pick_2026_late_1", "kind": "pick", "name": "2026 Late 1st", "position": null, "team": null, "value": 3000 },
+    { "id": "pick_2026_early_2", "kind": "pick", "name": "2026 Early 2nd", "position": null, "team": null, "value": 2200 },
+    { "id": "pick_2027_early_1", "kind": "pick", "name": "2027 Early 1st", "position": null, "team": null, "value": 3600 },
+    { "id": "pick_2027_mid_1", "kind": "pick", "name": "2027 Mid 1st", "position": null, "team": null, "value": 2800 }
+  ]
+}
