@@ -18,6 +18,9 @@
 # production
 /build
 
+# generated data dumps (npm run data:top50-breakdown)
+/output
+
 # misc
 .DS_Store
 *.pem

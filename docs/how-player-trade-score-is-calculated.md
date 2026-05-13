@@ -20,8 +20,9 @@ This is the **largest** part of the score.
 - **Scoring mode**: The catalog request tells the server whether your league is **full PPR**, **half PPR**, or **non-PPR**. The model uses the matching points column for each season row.
 - **Recency blend**: Recent season totals are weighted a bit more than the prior season so the score reacts to the latest year of football, without ignoring the previous year entirely.
 - **Two normalizations blended together**:
-  1. **Within your position**: your weighted per-game pace is compared to other players **at the same position** in the snapshot (roughly “how elite is this season line for a WR vs other WRs?”).
+  1. **Within your position**: your weighted per-game pace is compared to other players **at the same position** in the snapshot (roughly “how elite is this season line for a WR vs other WRs?”). Anchor percentiles use the **~5th–~95th** sample band (wider than a tight p10–p90 window) so elite starters are less compressed.
   2. **Across all skill positions**: the same player’s **weighted season point total** (log-scaled) is compared to everyone in the snapshot so an elite season at any skill spot earns a fair global bump.
+- **Elite tail mapping**: the blended 0–1 production strength is passed through a **piecewise “stretch”** on the upper tail before it is converted to trade points, so small differences among top producers map to larger point gaps than a purely linear norm.
 - **Output**: These two signals are blended, then mapped into a **wide band of base trade points** (the “fantasy production” line item in the technical breakdown).
 
 If there is **no row** for this player in the fantasy snapshot (common for some rookies or ID gaps), the model falls back to a **neutral production prior** and marks the row as missing, which lowers confidence.

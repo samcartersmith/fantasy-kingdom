@@ -19,16 +19,16 @@ export type FantasyProfilePayload = {
   profiles: Record<string, PlayerFantasyProfile>;
 };
 
-export type PositionalFpAnchors = Record<
-  SkillPosition,
-  { p10: number; p90: number; n: number } | null
->;
+/** Percentile band used to normalize PPG / log-points (wider lo–hi = more spread among elites). */
+export type FpQuantileBand = { lo: number; hi: number; n: number };
+
+export type PositionalFpAnchors = Record<SkillPosition, FpQuantileBand | null>;
 
 export type FpAnchors = {
   /** Per-position weighted PPG (for league scoring mode). */
   positionalWppg: PositionalFpAnchors;
   /** League-wide log(1 + weighted season points) percentiles. */
-  globalLogPts: { p10: number; p90: number; n: number } | null;
+  globalLogPts: FpQuantileBand | null;
 };
 
 export type FpScoringContext = {
@@ -80,22 +80,23 @@ export function weightedPpg(profile: PlayerFantasyProfile, ppr: PprMode): {
   return { wppg: 0, gamesWeight: 0 };
 }
 
-function percentileAnchors(sorted: number[]): { p10: number; p90: number; n: number } | null {
+/** ~5th / ~95th sample positions (wider than p10–p90) so elite starters separate more in normalized space. */
+function quantileAnchors(sorted: number[], qLo: number, qHi: number): FpQuantileBand | null {
   const n = sorted.length;
   if (n < 8) return null;
-  const p10 = sorted[Math.max(0, Math.floor(0.1 * (n - 1)))];
-  const p90 = sorted[Math.min(n - 1, Math.ceil(0.9 * (n - 1)))];
-  if (!(p90 > p10)) return { p10: p10 - 1e-6, p90: p10 + 1e-3, n };
-  return { p10, p90, n };
+  const lo = sorted[Math.max(0, Math.floor(qLo * (n - 1)))];
+  const hi = sorted[Math.min(n - 1, Math.ceil(qHi * (n - 1)))];
+  if (!(hi > lo)) return { lo: lo - 1e-6, hi: lo + 1e-3, n };
+  return { lo, hi, n };
 }
 
 function clamp01(x: number): number {
   return Math.max(0, Math.min(1, x));
 }
 
-function normFromAnchors(value: number, a: { p10: number; p90: number } | null): number {
+function normFromAnchors(value: number, a: FpQuantileBand | null): number {
   if (!a) return 0.5;
-  return clamp01((value - a.p10) / (a.p90 - a.p10));
+  return clamp01((value - a.lo) / (a.hi - a.lo));
 }
 
 /**
@@ -117,11 +118,11 @@ export function buildFpAnchors(profiles: Record<string, PlayerFantasyProfile>, p
   const positionalWppg: PositionalFpAnchors = { QB: null, RB: null, WR: null, TE: null };
   for (const pos of SKILL_ORDER) {
     const arr = byPos[pos].sort((x, y) => x - y);
-    positionalWppg[pos] = percentileAnchors(arr);
+    positionalWppg[pos] = quantileAnchors(arr, 0.05, 0.95);
   }
 
   const sortedG = globals.sort((x, y) => x - y);
-  const globalLogPts = percentileAnchors(sortedG);
+  const globalLogPts = quantileAnchors(sortedG, 0.05, 0.95);
 
   return { positionalWppg, globalLogPts };
 }
@@ -151,6 +152,18 @@ export const FP_BASELINE_DEFAULTS: FpBaselineConstants = {
 };
 
 /**
+ * Convexifies the upper tail of the blended 0–1 production norm so elite-vs-elite
+ * differences map to larger trade-point gaps (see player model review plan).
+ */
+export function stretchCombinedNorm01(raw: number): number {
+  const knee = 0.82;
+  const outKnee = 0.62;
+  const t = clamp01(raw);
+  if (t <= knee) return clamp01((t / knee) * outKnee);
+  return clamp01(outKnee + ((t - knee) / (1 - knee)) * (1 - outKnee));
+}
+
+/**
  * Maps fantasy profile + anchors into the main production-based score contribution.
  */
 export function productionBaseTradePoints(
@@ -161,9 +174,10 @@ export function productionBaseTradePoints(
   constants: FpBaselineConstants = FP_BASELINE_DEFAULTS,
 ): ProductionBaseResult {
   if (!profile) {
+    const combinedNorm01 = stretchCombinedNorm01(0.42);
     return {
-      basePoints: Math.round(constants.baseMin + 0.42 * constants.baseSpan),
-      combinedNorm01: 0.42,
+      basePoints: Math.round(constants.baseMin + combinedNorm01 * constants.baseSpan),
+      combinedNorm01,
       missing: true,
       gamesParticipation01: 0.5,
     };
@@ -180,7 +194,8 @@ export function productionBaseTradePoints(
   const globalNorm = normFromAnchors(logPts, anchors.globalLogPts);
 
   const g = constants.globalBlend;
-  const combinedNorm01 = (1 - g) * posNorm + g * globalNorm;
+  const blendedRaw = (1 - g) * posNorm + g * globalNorm;
+  const combinedNorm01 = stretchCombinedNorm01(blendedRaw);
 
   const basePoints = Math.round(constants.baseMin + combinedNorm01 * constants.baseSpan);
 

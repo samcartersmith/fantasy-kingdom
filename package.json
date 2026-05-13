@@ -7,7 +7,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "data:fantasy": "node scripts/build-fantasy-profiles.mjs"
+    "test": "vitest run",
+    "data:fantasy": "node scripts/build-fantasy-profiles.mjs",
+    "data:top50-breakdown": "node scripts/dump-top50-breakdown.mjs",
+    "data:curate:hydrate": "node scripts/hydrate-curated-from-sleeper.mjs",
+    "data:calibrate": "node scripts/calibrate-vs-reference.mjs"
   },
   "dependencies": {
     "next": "^15.3.0",
@@ -15,6 +19,7 @@
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "vitest": "^3.0.5",
     "@eslint/eslintrc": "^3",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
