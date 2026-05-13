@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type { CatalogAsset, LineItem } from "@/lib/trade-types";
 import { catalogPositionIncludesQb, effectiveValue } from "@/lib/trade-types";
+import { formatEvaluationTeaser } from "@/lib/trade-evaluation-format";
 import { PlayerHeadshot } from "@/components/trade/PlayerHeadshot";
 
 type Props = {
@@ -11,6 +12,8 @@ type Props = {
   description: string;
   lines: { line: LineItem; asset: CatalogAsset }[];
   superflex: boolean;
+  /** When true, `asset.value` already reflects league format from the server (no client QB bump). */
+  leagueFormatApplied: boolean;
   onRemove: (lineId: string) => void;
   /** Increment to replay one-shot add highlight on this side. */
   flashTick?: number;
@@ -22,6 +25,7 @@ export function TeamSide({
   description,
   lines,
   superflex,
+  leagueFormatApplied,
   onRemove,
   flashTick = 0,
 }: Props) {
@@ -42,10 +46,9 @@ export function TeamSide({
     };
   }, [flashTick]);
 
-  const total = lines.reduce(
-    (acc, { asset }) => acc + effectiveValue(asset, { superflex }),
-    0,
-  );
+  const effOpts = { superflex, leagueFormatApplied };
+
+  const total = lines.reduce((acc, { asset }) => acc + effectiveValue(asset, effOpts), 0);
 
   return (
     <section
@@ -70,7 +73,7 @@ export function TeamSide({
       ) : (
         <ul className="space-y-2 flex-1" aria-labelledby={headingId}>
           {lines.map(({ line, asset }) => {
-            const eff = effectiveValue(asset, { superflex });
+            const eff = effectiveValue(asset, effOpts);
             return (
               <li
                 key={line.lineId}
@@ -86,12 +89,18 @@ export function TeamSide({
                       {asset.kind === "pick" ? "Pick" : `${asset.position} · ${asset.team}`} ·{" "}
                       {eff.toLocaleString()}
                       {superflex &&
+                      !leagueFormatApplied &&
                       asset.kind === "player" &&
                       catalogPositionIncludesQb(asset.position) &&
                       eff !== asset.value ? (
                         <span className="text-dash-text/45"> (base {asset.value.toLocaleString()})</span>
                       ) : null}
                     </p>
+                    {asset.evaluation ? (
+                      <p className="text-[10px] text-dash-text/48 leading-snug mt-0.5">
+                        {formatEvaluationTeaser(asset.evaluation)}
+                      </p>
+                    ) : null}
                   </div>
                 </div>
                 <button

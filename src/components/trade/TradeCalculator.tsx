@@ -7,13 +7,26 @@ import {
   catalogPositionIncludesQb,
   effectiveValue,
 } from "@/lib/trade-types";
+import { formatEvaluationTeaser } from "@/lib/trade-evaluation-format";
 import { PlayerHeadshot } from "@/components/trade/PlayerHeadshot";
 import { TeamSide } from "@/components/trade/TeamSide";
 import { TotalsSummary } from "@/components/trade/TotalsSummary";
 
+type TradeCatalogMeta = {
+  pickCount?: number;
+  playerCount?: number;
+  tradeModelVersion?: string;
+  leagueFormatApplied?: boolean;
+  legacyHeuristic?: boolean;
+  curatedSnapshotAsOf?: string;
+  fantasyProfileSnapshotAsOf?: string;
+  fantasyProfileSource?: string;
+  valueBasis?: string;
+};
+
 type TradeCatalogResponse = {
   assets: CatalogAsset[];
-  meta?: { pickCount?: number; playerCount?: number };
+  meta?: TradeCatalogMeta;
 };
 
 function useLineId() {
@@ -44,16 +57,23 @@ export function TradeCalculator() {
   const [team2, setTeam2] = useState<LineItem[]>([]);
 
   const [catalog, setCatalog] = useState<CatalogAsset[] | null>(null);
+  const [catalogMeta, setCatalogMeta] = useState<TradeCatalogMeta | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [flashTicks, setFlashTicks] = useState<Record<1 | 2, number>>({ 1: 0, 2: 0 });
   const [addAnnounced, setAddAnnounced] = useState("");
+
+  const leagueFormatApplied = catalogMeta?.leagueFormatApplied === true;
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoadError(null);
       try {
-        const res = await fetch("/api/trade-catalog", { cache: "no-store" });
+        const params = new URLSearchParams();
+        params.set("superflex", superflex ? "1" : "0");
+        params.set("ppr", String(ppr));
+        params.set("league_size", String(leagueSize));
+        const res = await fetch(`/api/trade-catalog?${params.toString()}`, { cache: "no-store" });
         const body = (await res.json()) as TradeCatalogResponse & { error?: string };
         if (!res.ok) {
           throw new Error(body.error || `HTTP ${res.status}`);
@@ -61,18 +81,27 @@ export function TradeCalculator() {
         if (!body.assets?.length) {
           throw new Error("Empty catalog response");
         }
-        if (!cancelled) setCatalog(body.assets);
+        if (!cancelled) {
+          setCatalog(body.assets);
+          setCatalogMeta(body.meta ?? null);
+        }
       } catch (e) {
         if (!cancelled) {
           setLoadError(e instanceof Error ? e.message : "Failed to load catalog");
           setCatalog(null);
+          setCatalogMeta(null);
         }
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [superflex, ppr, leagueSize]);
+
+  const effOpts = useMemo(
+    () => ({ superflex, leagueFormatApplied }),
+    [superflex, leagueFormatApplied],
+  );
 
   const assetById = useMemo(() => (catalog ? buildAssetMap(catalog) : new Map<string, CatalogAsset>()), [catalog]);
 
@@ -135,11 +164,8 @@ export function TradeCalculator() {
 
   const sum = useCallback(
     (lines: { asset: CatalogAsset }[]) =>
-      lines.reduce(
-        (acc, { asset }) => acc + effectiveValue(asset, { superflex }),
-        0,
-      ),
-    [superflex],
+      lines.reduce((acc, { asset }) => acc + effectiveValue(asset, effOpts), 0),
+    [effOpts],
   );
 
   const total1 = sum(t1Resolved);
@@ -237,7 +263,9 @@ export function TradeCalculator() {
                   />
                 </button>
                 <span className="text-xs text-dash-text/55 max-w-[14rem] leading-snug">
-                  QB values ×{SUPERFLEX_QB_MULTIPLIER} when on (demo heuristic).
+                  {leagueFormatApplied
+                    ? `When on, QB values include the ×${SUPERFLEX_QB_MULTIPLIER} superflex premium in the catalog from the server.`
+                    : `QB values ×${SUPERFLEX_QB_MULTIPLIER} when on (applied client-side for legacy catalog).`}
                 </span>
               </div>
             </div>
@@ -251,9 +279,21 @@ export function TradeCalculator() {
           </button>
         </div>
         <p className="text-xs text-dash-text/50 leading-relaxed">
-          {leagueSize}-team · {ppr === 1 ? "Full PPR" : ppr === 0.5 ? "Half PPR" : "Non-PPR"} — display context only;
-          trade points still use the Sleeper search rank + trending-adds heuristic.
+          {leagueSize}-team · {ppr === 1 ? "Full PPR" : ppr === 0.5 ? "Half PPR" : "Non-PPR"}
+          {leagueFormatApplied
+            ? " — these settings are sent to the server so trade points match your league format."
+            : " — display context only; legacy catalog uses Sleeper buzz with client-side superflex for QBs."}
         </p>
+        {catalogMeta?.tradeModelVersion ? (
+          <p className="text-xs text-dash-text/55 leading-relaxed">
+            Fair-trade model {catalogMeta.tradeModelVersion}
+            {catalogMeta.curatedSnapshotAsOf ? ` · curated tables as of ${catalogMeta.curatedSnapshotAsOf}` : ""}
+            {catalogMeta.fantasyProfileSnapshotAsOf
+              ? ` · fantasy stat snapshot ${catalogMeta.fantasyProfileSnapshotAsOf}`
+              : ""}
+            .
+          </p>
+        ) : null}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
@@ -263,6 +303,7 @@ export function TradeCalculator() {
           description="Assets on this side of the trade."
           lines={t1Resolved}
           superflex={superflex}
+          leagueFormatApplied={leagueFormatApplied}
           flashTick={flashTicks[1]}
           onRemove={(lineId) => removeFrom(1, lineId)}
         />
@@ -272,6 +313,7 @@ export function TradeCalculator() {
           description="Assets on this side of the trade."
           lines={t2Resolved}
           superflex={superflex}
+          leagueFormatApplied={leagueFormatApplied}
           flashTick={flashTicks[2]}
           onRemove={(lineId) => removeFrom(2, lineId)}
         />
@@ -320,22 +362,25 @@ export function TradeCalculator() {
                   {asset.kind === "pick"
                     ? "Draft pick"
                     : `${asset.position} · ${asset.team}`}{" "}
-                  · value {asset.value.toLocaleString()}
+                  · trade pts {effectiveValue(asset, effOpts).toLocaleString()}
                   {asset.kind === "player" ? (
                     <span className="text-dash-text/45">
                       {" "}
                       · Sleeper search rank {asset.sleeperSearchRank ?? "—"} · adds {asset.sleeperTrendingAdds ?? 0}
                     </span>
                   ) : null}
-                  {superflex &&
+                  {!leagueFormatApplied &&
+                  superflex &&
                   asset.kind === "player" &&
                   catalogPositionIncludesQb(asset.position) ? (
-                    <span className="text-dash-success">
-                      {" "}
-                      → eff. {effectiveValue(asset, { superflex }).toLocaleString()}
-                    </span>
+                    <span className="text-dash-text/45"> (base {asset.value.toLocaleString()})</span>
                   ) : null}
                 </p>
+                {asset.evaluation ? (
+                  <p className="text-[10px] text-dash-text/50 leading-snug mt-0.5">
+                    {formatEvaluationTeaser(asset.evaluation)}
+                  </p>
+                ) : null}
                 </div>
               </div>
               <div className="flex flex-wrap shrink-0 gap-2">
