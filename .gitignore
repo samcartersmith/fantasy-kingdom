@@ -18,7 +18,7 @@
 # production
 /build
 
-# generated data dumps (npm run data:top50-breakdown)
+# generated data dumps (npm run data:top50-breakdown → output/*.html or *.csv)
 /output
 
 # misc

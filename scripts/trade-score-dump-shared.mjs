@@ -185,10 +185,12 @@ export function ageCurve01(ageYears, positionLabel) {
 export function futureOutlookRaw(input) {
   const parts = [];
   if (!input.missingAge) parts.push(input.age01);
-  if (!input.missingTeam) parts.push(input.team01);
+  parts.push(input.missingTeam ? NEUTRAL : input.team01);
   if (!input.missingRole) parts.push(input.role01);
   if (parts.length === 0) return { value01: NEUTRAL, missing: true };
-  return { value01: parts.reduce((a, b) => a + b, 0) / parts.length, missing: false };
+  const v = parts.reduce((a, b) => a + b, 0) / parts.length;
+  const allMissing = input.missingAge && input.missingTeam && input.missingRole;
+  return { value01: v, missing: allMissing };
 }
 
 export function pprReceiverTilt01(ppr) {
