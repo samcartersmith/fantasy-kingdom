@@ -1,0 +1,16 @@
+---
+description: Merge work via GitHub pull requests, not direct pushes to main
+alwaysApply: true
+---
+
+# Git and pull request workflow
+
+When finishing a feature branch or the user asks to merge:
+
+1. **Commit** on the feature branch and **`git push origin <branch>`**.
+2. **Open a pull request on GitHub** (Compare & pull request from the branch, or `gh pr create` if the CLI is available).
+3. **Merge using the GitHub PR UI** (or `gh pr merge`), so the change is recorded as a PR with normal review/history.
+
+**Do not** merge by checking out `main`, merging the branch locally, and pushing `main` unless the user **explicitly** asks for a local merge (e.g. no GitHub access, emergency).
+
+If `gh` is not installed, still push the branch and tell the user to open/merge the PR in the browser; do not substitute a silent local merge to `main`.
