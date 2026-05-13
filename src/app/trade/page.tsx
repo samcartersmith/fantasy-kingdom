@@ -12,8 +12,13 @@ export default function TradePage() {
       <TradeCalculator />
       <footer className="max-w-3xl space-y-3 pt-2">
         <p className="text-sm sm:text-base text-dash-text/70 leading-relaxed">
-          Build two sides using Sleeper-backed player rows and heuristic values (search rank + add trending). Superflex
-          bumps QB numbers for illustration only — not league-specific scoring.
+          Player trade points are led by recent fantasy scoring (a Sleeper stat snapshot; run{" "}
+          <code className="text-[11px] bg-black/30 px-1 rounded">npm run data:fantasy</code> to refresh), with smaller
+          nudges for games played, curated team and OC tiers, optional role and injury rows, age, league format, and a
+          capped Sleeper buzz tweak. Picks use local anchors plus class strength and time discounting. Nothing here is a
+          market dollar or official Sleeper trade value. Step-by-step methodology:{" "}
+          <code className="text-[11px] bg-black/30 px-1 rounded break-all">docs/how-player-trade-score-is-calculated.md</code>
+          .
         </p>
         <p className="text-xs text-dash-text/55 leading-relaxed">
           Players and teams come from the{" "}
@@ -25,11 +30,12 @@ export default function TradePage() {
           >
             Sleeper API
           </a>{" "}
-          (cached ~24h). Trade values use the same Sleeper-derived heuristic as{" "}
+          (cached ~24h). Rankings at{" "}
           <Link href="/rankings" className="text-dash-primary hover:underline">
-            rankings
+            /rankings
           </Link>{" "}
-          (search rank + trending adds — not a market dollar).
+          still use the Sleeper-only heuristic; the trade catalog uses the fair-trade model unless you call{" "}
+          <code className="text-[11px] bg-black/30 px-1 rounded">/api/trade-catalog?legacy=1</code>.
         </p>
       </footer>
     </div>

@@ -6,7 +6,8 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "data:fantasy": "node scripts/build-fantasy-profiles.mjs"
   },
   "dependencies": {
     "next": "^15.3.0",

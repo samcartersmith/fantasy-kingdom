@@ -1,3 +1,5 @@
+import type { CatalogEvaluation } from "@/lib/trade-model/types";
+
 export type AssetKind = "player" | "pick";
 
 export type CatalogAsset = {
@@ -15,6 +17,8 @@ export type CatalogAsset = {
   sleeperSearchRank?: number | null;
   /** Recent add count from Sleeper trending (window set in API). */
   sleeperTrendingAdds?: number;
+  /** Explainable model breakdown when the fair-trade model ran for this asset. */
+  evaluation?: CatalogEvaluation;
 };
 
 export type LineItem = {
@@ -32,8 +36,11 @@ export function catalogPositionIncludesQb(position: string | null): boolean {
 
 export function effectiveValue(
   asset: CatalogAsset,
-  options: { superflex: boolean },
+  options: { superflex: boolean; leagueFormatApplied?: boolean },
 ): number {
+  if (options.leagueFormatApplied) {
+    return asset.value;
+  }
   if (
     options.superflex &&
     asset.kind === "player" &&
