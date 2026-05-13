@@ -94,9 +94,17 @@ This section extends the Dashboard skill for **this repo only**. Do not edit the
 
 ### Tokens ([`src/app/globals.css`](src/app/globals.css))
 
-- **`--dash-border`**: 1px border on `.dash-glass-panel`; stronger edge on the dark surface (currently higher white alpha than the legacy 0.1 default).
-- **`--dash-ring`**: optional semantic ring color for Tailwind via `--color-dash-ring` in `@theme inline` (use `ring-dash-ring` / `border-dash-border` when aligning utilities with panels).
+- **`--dash-border`**: `rgba(255, 255, 255, 0.45)` — the **strong** rim for **`.dash-glass-panel`** and nested roster tiles. Exposed in Tailwind as **`border-dash-border`** / **`divide-dash-border`**. Plain form controls in trade often use **`border-white/10`** or **`border-white/15`** instead (see Structural borders).
+- **`--dash-ring`**: optional semantic ring color for Tailwind via `--color-dash-ring` in `@theme inline` (use `ring-dash-ring` when aligning focus/utility rings with tokens).
 - **`--dash-glass`**: panel fill; keep hierarchy: surface, then glass fill, then border.
+
+### Structural borders
+
+- **Glass panels** (`.dash-glass-panel`): use **`border-dash-border`** / `var(--dash-border)` (`rgba(255, 255, 255, 0.45)`) — this is the strong outer rim for dashboard cards.
+- **Softer controls inside trade** (so they don’t compete with the panel edge): **native `<select>`** (`.dash-trade-select` + Tailwind **`border-white/15`**), **text search inputs**, **catalog suggestion `<ul>`** (container **`border-white/10`**, row dividers **`divide-white/10`**), the **TotalsSummary** share bar (**`border-white/10`**), and **Clear both sides** (**`border-white/15`**) use lower-opacity whites instead of `border-dash-border`.
+- **Team roster rows** in [`TeamSide`](src/components/trade/TeamSide.tsx) stay on **`border-dash-border`** so each line item still reads as a nested tile against the glass card.
+- For **internal row dividers** in the soft suggestion lists, use **`divide-white/10`** (not `divide-dash-border`).
+- **Exceptions**: semantic accents (`border-dash-danger/30`, `border-dash-secondary/60`), loading spinners, intentional hero sections.
 
 ### Glass panels
 
@@ -111,11 +119,16 @@ This section extends the Dashboard skill for **this repo only**. Do not edit the
 
 ### Trade calculator ([`src/components/trade/TradeCalculator.tsx`](src/components/trade/TradeCalculator.tsx), [`src/components/trade/TeamSide.tsx`](src/components/trade/TeamSide.tsx))
 
+- **Per-team card**: each `TeamSide` receives the full **`catalog`** plus **`onAddAsset`**; a **search field and suggestions** live in the card (typed query uses [`filterTradeCatalogSuggestions`](src/lib/trade-catalog-filter.ts) with `includeEmptyQueryDefaults: false`; empty query shows no rows). **Roster rows render above the search**; **Subtotal** stays in the header when the side is non-empty.
+- **Global catalog block** below the grid still offers “Add to team 1 / 2” for the same catalog.
+- **Main catalog panel**: **Tabs** (`Picks`, `QB`, `RB`, `WR`, `TE`) sit above the search; the active tab **scopes** assets (picks only, or players whose `position` string includes that skill via [`catalogPlayerHasSkillPosition`](src/lib/trade-types.ts)), then [`filterTradeCatalogSuggestions`](src/lib/trade-catalog-filter.ts) applies the search query on that subset. Tab buttons mirror the [`RankingsExplorer`](src/components/rankings/RankingsExplorer.tsx) pattern (`role="tablist"` / `role="tab"`, selected `bg-dash-primary`).
 - **Add to team**: increments a per-side `flashTick` passed to `TeamSide`; the panel runs the **`dash-animate-team-flash`** class (keyframes `dash-team-flash` in globals) under `prefers-reduced-motion: no-preference`.
 - **Screen readers**: hidden live region announces `Added {name} to Team {n}.` on each add (`aria-live="polite"`, `aria-atomic="true"`).
+- **Borders in trade UI**: **Card shells** use the glass panel token (**`border-dash-border`**). **Selects**, **search fields**, **suggestion dropdown lists** (border + **`divide-white/10`**), the **comparison value bar**, and **Clear** use **softer** `border-white/10` / **`border-white/15`** as documented above. **Roster `<li>`** tiles use **`border-dash-border`**.
 
 ### QA (code review)
 
-- Panel borders use the token; no accidental double-faint rings on `dash-glass-panel`.
+- Glass **panel** borders use **`border-dash-border`**; softer trade controls (select, search, suggestion lists, value bar, Clear) use **`border-white/10|15`** as in the skill — roster lines stay **`border-dash-border`**.
+- No accidental double-faint rings on `dash-glass-panel`.
 - Buttons show pointer + press affordance; reduced-motion users still get live text for trade adds.
 - Focus states remain visible on keyboard nav.

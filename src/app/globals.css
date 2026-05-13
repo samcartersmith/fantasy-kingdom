@@ -51,6 +51,21 @@ body {
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 8px 32px rgba(0, 0, 0, 0.35);
 }
 
+/* Native <select> with matching horizontal inset: text and chevron sit the same distance from each edge */
+.dash-trade-select {
+  --dash-select-inset: 0.75rem;
+  --dash-select-chevron: 1rem;
+  appearance: none;
+  -webkit-appearance: none;
+  background-color: rgba(0, 0, 0, 0.35);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23fafafa' stroke-opacity='0.72' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-size: var(--dash-select-chevron) var(--dash-select-chevron);
+  background-position: right var(--dash-select-inset) center;
+  padding-left: var(--dash-select-inset);
+  padding-right: calc(var(--dash-select-inset) + var(--dash-select-chevron) + 0.25rem);
+}
+
 /* One-shot panel highlight after trade add (TeamSide); respects reduced motion via short duration */
 @keyframes dash-team-flash {
   0% {
