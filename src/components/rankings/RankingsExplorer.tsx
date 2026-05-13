@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { SleeperRankingRow } from "@/lib/sleeper-ranking";
 
-const TABS = ["ALL", "QB", "RB", "WR", "TE", "K", "DEF"] as const;
+const TABS = ["ALL", "QB", "RB", "WR", "TE"] as const;
 
 type Tab = (typeof TABS)[number];
 
@@ -52,7 +52,7 @@ export function RankingsExplorer() {
             role="tab"
             aria-selected={tab === t}
             onClick={() => setTab(t)}
-            className={`min-h-11 px-3 rounded-[var(--dash-radius-sm)] text-sm font-medium border transition-colors ${
+            className={`min-h-11 px-3 rounded-[var(--dash-radius-sm)] text-sm font-medium border cursor-pointer motion-safe:transition motion-safe:duration-150 motion-safe:active:scale-[0.97] ${
               tab === t
                 ? "bg-dash-primary text-dash-text border-dash-primary"
                 : "bg-black/25 text-dash-text/85 border-white/15 hover:bg-white/5"
@@ -77,7 +77,7 @@ export function RankingsExplorer() {
       ) : null}
 
       {rows && rows.length > 0 ? (
-        <div className="dash-glass-panel rounded-[var(--dash-radius-md)] ring-1 ring-white/[0.06] overflow-hidden">
+        <div className="dash-glass-panel rounded-[var(--dash-radius-md)] overflow-hidden">
           <div className="overflow-x-auto max-h-[min(70vh,720px)] overflow-y-auto">
             <table className="w-full text-sm text-left min-w-[640px]">
               <thead className="sticky top-0 z-[1] bg-dash-surface-elevated/95 backdrop-blur-sm border-b border-white/10">

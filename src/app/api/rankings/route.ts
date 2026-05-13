@@ -6,7 +6,7 @@ import { SLEEPER_TRENDING_REVALIDATE_SECONDS } from "@/lib/sleeper-constants";
 /** Revalidate this route when trending data is expected to refresh. */
 export const revalidate = SLEEPER_TRENDING_REVALIDATE_SECONDS;
 
-const ALLOWED = new Set(["ALL", "QB", "RB", "WR", "TE", "K", "DEF"]);
+const ALLOWED = new Set(["ALL", "QB", "RB", "WR", "TE"]);
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);

@@ -1,7 +1,8 @@
 import type { CatalogAsset } from "@/lib/trade-types";
 import type { SleeperNflPlayersMap } from "@/lib/sleeper-types";
 import {
-  fantasyPrimary,
+  getSkillFantasyPositions,
+  skillPositionsDisplay,
   sleeperDisplayName,
   tradeValueFromSleeperSignals,
 } from "@/lib/sleeper-ranking";
@@ -9,6 +10,7 @@ import {
 /**
  * Turns Sleeper's full NFL players map into slim catalog rows for the trade UI.
  * Only includes active NFL athletes with numeric Sleeper ids (excludes stray map keys).
+ * Only skill positions (QB, RB, WR, TE), including multi-eligible players.
  * `value` uses Sleeper `search_rank` + trending add counts (see sleeper-ranking.ts).
  */
 export function sleeperPlayersMapToCatalog(
@@ -26,22 +28,26 @@ export function sleeperPlayersMapToCatalog(
     const team = (raw.team ?? "").trim();
     if (!team) continue;
 
-    const pos = fantasyPrimary(raw);
+    const skillPos = getSkillFantasyPositions(raw);
+    if (skillPos.length === 0) continue;
+
     const sr =
       typeof raw.search_rank === "number" && Number.isFinite(raw.search_rank) && raw.search_rank > 0
         ? raw.search_rank
         : null;
     const ta = trendingAdds.get(String(pid)) ?? 0;
     const value = tradeValueFromSleeperSignals(sr, ta);
+    const pidStr = String(pid);
 
     out.push({
-      id: `sleeper_${pid}`,
+      id: `sleeper_${pidStr}`,
       kind: "player",
       name: sleeperDisplayName(raw),
-      position: pos,
+      position: skillPositionsDisplay(skillPos),
       team,
       value,
-      sleeperPlayerId: String(pid),
+      sleeperPlayerId: pidStr,
+      imageUrl: `https://sleepercdn.com/content/nfl/players/${pidStr}.jpg`,
       sleeperSearchRank: sr,
       sleeperTrendingAdds: ta,
     });

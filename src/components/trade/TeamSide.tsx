@@ -1,5 +1,9 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import type { CatalogAsset, LineItem } from "@/lib/trade-types";
-import { effectiveValue } from "@/lib/trade-types";
+import { catalogPositionIncludesQb, effectiveValue } from "@/lib/trade-types";
+import { PlayerHeadshot } from "@/components/trade/PlayerHeadshot";
 
 type Props = {
   side: 1 | 2;
@@ -8,11 +12,35 @@ type Props = {
   lines: { line: LineItem; asset: CatalogAsset }[];
   superflex: boolean;
   onRemove: (lineId: string) => void;
+  /** Increment to replay one-shot add highlight on this side. */
+  flashTick?: number;
 };
 
-export function TeamSide({ side, title, description, lines, superflex, onRemove }: Props) {
+export function TeamSide({
+  side,
+  title,
+  description,
+  lines,
+  superflex,
+  onRemove,
+  flashTick = 0,
+}: Props) {
   const headingId = `team-${side}-heading`;
   const regionLabel = `${title} trade pieces`;
+  const [flashPlay, setFlashPlay] = useState(false);
+
+  useEffect(() => {
+    if (flashTick === 0) return;
+    setFlashPlay(false);
+    const id = requestAnimationFrame(() => {
+      setFlashPlay(true);
+    });
+    const done = window.setTimeout(() => setFlashPlay(false), 600);
+    return () => {
+      cancelAnimationFrame(id);
+      clearTimeout(done);
+    };
+  }, [flashTick]);
 
   const total = lines.reduce(
     (acc, { asset }) => acc + effectiveValue(asset, { superflex }),
@@ -22,7 +50,10 @@ export function TeamSide({ side, title, description, lines, superflex, onRemove 
   return (
     <section
       aria-label={regionLabel}
-      className="dash-glass-panel rounded-[var(--dash-radius-md)] p-4 sm:p-6 flex flex-col min-h-[280px] ring-1 ring-white/[0.06]"
+      className={`dash-glass-panel rounded-[var(--dash-radius-md)] p-4 sm:p-6 flex flex-col min-h-[280px] ${flashPlay ? "dash-animate-team-flash" : ""}`}
+      onAnimationEnd={(e) => {
+        if (e.animationName === "dash-team-flash") setFlashPlay(false);
+      }}
     >
       <header className="mb-4 space-y-1">
         <h2 id={headingId} className="text-lg font-bold tracking-tight text-dash-text">
@@ -45,20 +76,28 @@ export function TeamSide({ side, title, description, lines, superflex, onRemove 
                 key={line.lineId}
                 className="flex items-start justify-between gap-3 rounded-[var(--dash-radius-sm)] border border-white/10 bg-black/25 px-3 py-2"
               >
-                <div className="min-w-0">
-                  <p className="font-medium text-sm text-dash-text truncate">{asset.name}</p>
-                  <p className="text-xs font-mono text-dash-text/55">
-                    {asset.kind === "pick" ? "Pick" : `${asset.position} · ${asset.team}`} ·{" "}
-                    {eff.toLocaleString()}
-                    {superflex && asset.position === "QB" && eff !== asset.value ? (
-                      <span className="text-dash-text/45"> (base {asset.value.toLocaleString()})</span>
-                    ) : null}
-                  </p>
+                <div className="min-w-0 flex gap-3 flex-1">
+                  {asset.kind === "player" ? (
+                    <PlayerHeadshot imageUrl={asset.imageUrl} name={asset.name} />
+                  ) : null}
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-sm text-dash-text truncate">{asset.name}</p>
+                    <p className="text-xs font-mono text-dash-text/55">
+                      {asset.kind === "pick" ? "Pick" : `${asset.position} · ${asset.team}`} ·{" "}
+                      {eff.toLocaleString()}
+                      {superflex &&
+                      asset.kind === "player" &&
+                      catalogPositionIncludesQb(asset.position) &&
+                      eff !== asset.value ? (
+                        <span className="text-dash-text/45"> (base {asset.value.toLocaleString()})</span>
+                      ) : null}
+                    </p>
+                  </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => onRemove(line.lineId)}
-                  className="shrink-0 min-h-11 min-w-11 inline-flex items-center justify-center text-xs font-medium text-dash-danger hover:underline rounded-[var(--dash-radius-sm)] px-2"
+                  className="shrink-0 min-h-11 min-w-11 cursor-pointer motion-safe:transition motion-safe:duration-150 motion-safe:active:scale-[0.97] inline-flex items-center justify-center text-xs font-medium text-dash-danger hover:underline rounded-[var(--dash-radius-sm)] px-2"
                   aria-label={`Remove ${asset.name} from ${title}`}
                 >
                   Remove

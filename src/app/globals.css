@@ -10,7 +10,9 @@
   --dash-surface: #09090b;
   --dash-surface-elevated: #0f0f12;
   --dash-text: #fafafa;
-  --dash-border: rgba(255, 255, 255, 0.1);
+  /* Stronger panel edge on dark surface (glass panels + matching rings) */
+  --dash-border: rgba(255, 255, 255, 0.45);
+  --dash-ring: rgba(255, 255, 255, 0.14);
   --dash-glass: rgba(255, 255, 255, 0.06);
   --dash-radius-sm: 8px;
   --dash-radius-md: 12px;
@@ -25,6 +27,8 @@
   --color-dash-surface: var(--dash-surface);
   --color-dash-surface-elevated: var(--dash-surface-elevated);
   --color-dash-text: var(--dash-text);
+  --color-dash-border: var(--dash-border);
+  --color-dash-ring: var(--dash-ring);
   --font-sans: var(--font-ibm-plex-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-ibm-plex-sans), ui-sans-serif, system-ui, sans-serif;
 }
@@ -47,6 +51,28 @@ body {
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 8px 32px rgba(0, 0, 0, 0.35);
 }
 
+/* One-shot panel highlight after trade add (TeamSide); respects reduced motion via short duration */
+@keyframes dash-team-flash {
+  0% {
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.04) inset,
+      0 8px 32px rgba(0, 0, 0, 0.35),
+      0 0 0 0 color-mix(in srgb, var(--dash-primary) 55%, transparent);
+  }
+  100% {
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.04) inset,
+      0 8px 32px rgba(0, 0, 0, 0.35),
+      0 0 0 12px transparent;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .dash-animate-team-flash {
+    animation: dash-team-flash 0.55s ease-out 1;
+  }
+}
+
 /* Visible focus — high contrast on dark */
 :focus-visible {
   outline: 2px solid var(--dash-primary);
@@ -65,6 +91,18 @@ body {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
 }
 
 .skip-link {

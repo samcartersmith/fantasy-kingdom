@@ -56,12 +56,29 @@ export function sleeperDisplayName(p: SleeperNflPlayer): string {
   return combined || "Unknown player";
 }
 
-export function fantasyPrimary(p: SleeperNflPlayer): string {
-  const base = (p.position ?? "").toUpperCase();
-  if (["QB", "RB", "WR", "TE", "K", "DEF"].includes(base)) return base;
-  const fp = p.fantasy_positions?.filter(Boolean);
-  if (fp?.length) return fp[0]!.toUpperCase();
-  return "UNK";
+const SKILL_POSITIONS = ["QB", "RB", "WR", "TE"] as const;
+export type SkillPosition = (typeof SKILL_POSITIONS)[number];
+const SKILL_SET = new Set<string>(SKILL_POSITIONS);
+const SKILL_ORDER: Record<SkillPosition, number> = { QB: 0, RB: 1, WR: 2, TE: 3 };
+
+function normalizeSkillPos(p: string | null | undefined): string {
+  return (p ?? "").trim().toUpperCase();
+}
+
+/** QB/RB/WR/TE only, deduped, stable order (QB → RB → WR → TE). Matches trade catalog. */
+export function getSkillFantasyPositions(raw: SleeperNflPlayer): SkillPosition[] {
+  const found = new Set<SkillPosition>();
+  for (const p of raw.fantasy_positions ?? []) {
+    const u = normalizeSkillPos(p);
+    if (SKILL_SET.has(u)) found.add(u as SkillPosition);
+  }
+  const base = normalizeSkillPos(raw.position);
+  if (SKILL_SET.has(base)) found.add(base as SkillPosition);
+  return Array.from(found).sort((a, b) => SKILL_ORDER[a] - SKILL_ORDER[b]);
+}
+
+export function skillPositionsDisplay(positions: SkillPosition[]): string {
+  return positions.join(",");
 }
 
 function isRankableNflPlayer(raw: SleeperNflPlayer, key: string): string | null {
@@ -74,11 +91,10 @@ function isRankableNflPlayer(raw: SleeperNflPlayer, key: string): string | null 
   return String(pid);
 }
 
-const RANKING_POSITIONS = new Set(["QB", "RB", "WR", "TE", "K", "DEF"]);
-
 /**
  * Build sorted ranking rows from the full players map + trending adds.
- * @param positionFilter `ALL` or a single position code (QB, RB, WR, TE, K, DEF).
+ * Only QB/RB/WR/TE (including multi-eligible), same universe as the trade calculator catalog.
+ * @param positionFilter `ALL` or a single skill position (QB, RB, WR, TE). Multi-pos players appear under each tab they qualify for.
  */
 export function buildSleeperRankingRows(
   map: SleeperNflPlayersMap,
@@ -94,9 +110,9 @@ export function buildSleeperRankingRows(
     const pid = isRankableNflPlayer(raw, key);
     if (!pid) continue;
 
-    const pos = fantasyPrimary(raw);
-    if (!RANKING_POSITIONS.has(pos)) continue;
-    if (want !== "ALL" && pos !== want) continue;
+    const skills = getSkillFantasyPositions(raw);
+    if (skills.length === 0) continue;
+    if (want !== "ALL" && !skills.includes(want as SkillPosition)) continue;
 
     const sr = normalizedSearchRank(raw);
     const ta = trendingAdds.get(pid) ?? 0;
@@ -107,7 +123,7 @@ export function buildSleeperRankingRows(
       sleeperPlayerId: pid,
       name: sleeperDisplayName(raw),
       team: (raw.team ?? "").trim(),
-      position: pos,
+      position: skillPositionsDisplay(skills),
       search_rank: sr,
       trending_adds: ta,
       value,

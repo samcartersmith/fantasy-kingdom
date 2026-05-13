@@ -2,7 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CatalogAsset, LineItem } from "@/lib/trade-types";
-import { SUPERFLEX_QB_MULTIPLIER, effectiveValue } from "@/lib/trade-types";
+import {
+  SUPERFLEX_QB_MULTIPLIER,
+  catalogPositionIncludesQb,
+  effectiveValue,
+} from "@/lib/trade-types";
+import { PlayerHeadshot } from "@/components/trade/PlayerHeadshot";
 import { TeamSide } from "@/components/trade/TeamSide";
 import { TotalsSummary } from "@/components/trade/TotalsSummary";
 
@@ -23,15 +28,25 @@ function buildAssetMap(assets: CatalogAsset[]): Map<string, CatalogAsset> {
   return new Map(assets.map((a) => [a.id, a]));
 }
 
+const selectFieldClass =
+  "min-h-11 w-full min-w-[8.5rem] cursor-pointer rounded-[var(--dash-radius-sm)] border border-white/15 bg-black/35 px-3 py-2 text-sm text-dash-text";
+
+const btnPress =
+  "cursor-pointer motion-safe:transition motion-safe:duration-150 motion-safe:active:scale-[0.97]";
+
 export function TradeCalculator() {
   const nextLineId = useLineId();
   const [superflex, setSuperflex] = useState(false);
+  const [leagueSize, setLeagueSize] = useState<8 | 10 | 12 | 14>(12);
+  const [ppr, setPpr] = useState<1 | 0.5 | 0>(1);
   const [query, setQuery] = useState("");
   const [team1, setTeam1] = useState<LineItem[]>([]);
   const [team2, setTeam2] = useState<LineItem[]>([]);
 
   const [catalog, setCatalog] = useState<CatalogAsset[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [flashTicks, setFlashTicks] = useState<Record<1 | 2, number>>({ 1: 0, 2: 0 });
+  const [addAnnounced, setAddAnnounced] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -84,10 +99,12 @@ export function TradeCalculator() {
   }, [catalog, query]);
 
   const addTo = useCallback(
-    (side: 1 | 2, assetId: string) => {
+    (side: 1 | 2, assetId: string, displayName: string) => {
       const line: LineItem = { lineId: nextLineId(), assetId };
       if (side === 1) setTeam1((prev) => [...prev, line]);
       else setTeam2((prev) => [...prev, line]);
+      setFlashTicks((prev) => ({ ...prev, [side]: prev[side] + 1 }));
+      setAddAnnounced(`Added ${displayName} to Team ${side}.`);
     },
     [nextLineId],
   );
@@ -146,7 +163,7 @@ export function TradeCalculator() {
   if (!catalog) {
     return (
       <div
-        className="dash-glass-panel rounded-[var(--dash-radius-md)] p-8 ring-1 ring-white/[0.06] flex flex-col items-center gap-3"
+        className="dash-glass-panel rounded-[var(--dash-radius-md)] p-8 flex flex-col items-center gap-3"
         aria-busy="true"
         aria-live="polite"
       >
@@ -158,51 +175,111 @@ export function TradeCalculator() {
 
   return (
     <div className="space-y-8">
-      <p className="text-xs text-dash-text/55">
-        Players and teams come from the{" "}
-        <a
-          href="https://docs.sleeper.com"
-          className="text-dash-primary hover:underline"
-          target="_blank"
-          rel="noreferrer"
-        >
-          Sleeper API
-        </a>{" "}
-        (cached ~24h). Trade values use the same Sleeper-derived heuristic as{" "}
-        <a href="/rankings" className="text-dash-primary hover:underline">
-          rankings
-        </a>{" "}
-        (search rank + trending adds — not a market dollar).
+      <p id="trade-add-status" className="sr-only" aria-live="polite" aria-atomic="true">
+        {addAnnounced}
       </p>
 
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 dash-glass-panel rounded-[var(--dash-radius-md)] p-4 sm:p-5 ring-1 ring-white/[0.06]">
-        <div className="flex items-start gap-3 min-h-11">
-          <input
-            id="superflex-toggle"
-            type="checkbox"
-            checked={superflex}
-            onChange={(e) => setSuperflex(e.target.checked)}
-            className="mt-1 size-5 shrink-0 rounded border-white/30 bg-black/30 text-dash-primary focus:ring-2 focus:ring-dash-primary focus:ring-offset-2 focus:ring-offset-dash-surface"
-          />
-          <label htmlFor="superflex-toggle" className="text-sm font-medium cursor-pointer select-none text-dash-text">
-            Superflex mode
-            <span className="block text-xs font-normal text-dash-text/60 mt-0.5">
-              QB values multiplied by {SUPERFLEX_QB_MULTIPLIER} for demo heuristic only.
-            </span>
-          </label>
+      <TotalsSummary total1={total1} total2={total2} />
+
+      <div className="dash-glass-panel rounded-[var(--dash-radius-md)] p-4 sm:p-5 space-y-3">
+        <div className="flex flex-col gap-4 xl:flex-row xl:flex-wrap xl:items-end xl:justify-between">
+          <div className="flex flex-col sm:flex-row sm:flex-wrap gap-4 sm:gap-6 flex-1">
+            <div className="space-y-1.5 min-w-0 sm:min-w-[9rem]">
+              <label htmlFor="trade-league-size" className="text-sm font-medium text-dash-text/85">
+                League size
+              </label>
+              <select
+                id="trade-league-size"
+                value={leagueSize}
+                onChange={(e) => setLeagueSize(Number(e.target.value) as 8 | 10 | 12 | 14)}
+                className={selectFieldClass}
+              >
+                <option value={8}>8 teams</option>
+                <option value={10}>10 teams</option>
+                <option value={12}>12 teams</option>
+                <option value={14}>14 teams</option>
+              </select>
+            </div>
+            <div className="space-y-1.5 min-w-0 sm:min-w-[10.5rem]">
+              <label htmlFor="trade-ppr" className="text-sm font-medium text-dash-text/85">
+                PPR
+              </label>
+              <select
+                id="trade-ppr"
+                value={String(ppr)}
+                onChange={(e) => setPpr(Number(e.target.value) as 1 | 0.5 | 0)}
+                className={selectFieldClass}
+              >
+                <option value={1}>Full PPR (1.0)</option>
+                <option value={0.5}>Half PPR (0.5)</option>
+                <option value={0}>Non-PPR (0)</option>
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <span id="trade-superflex-label" className="block text-sm font-medium text-dash-text/85">
+                Superflex
+              </span>
+              <div className="flex items-center gap-3 min-h-11">
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={superflex}
+                  aria-labelledby="trade-superflex-label"
+                  onClick={() => setSuperflex((v) => !v)}
+                  className={`relative h-7 w-12 shrink-0 cursor-pointer rounded-full motion-safe:transition motion-safe:duration-150 motion-safe:active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dash-primary focus-visible:ring-offset-2 focus-visible:ring-offset-dash-surface ${
+                    superflex ? "bg-dash-primary" : "bg-white/25"
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none absolute top-1 left-1 block h-5 w-5 rounded-full bg-white shadow motion-safe:transition-transform motion-safe:duration-150 ${
+                      superflex ? "translate-x-5" : "translate-x-0"
+                    }`}
+                  />
+                </button>
+                <span className="text-xs text-dash-text/55 max-w-[14rem] leading-snug">
+                  QB values ×{SUPERFLEX_QB_MULTIPLIER} when on (demo heuristic).
+                </span>
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={clearAll}
+            className={`${btnPress} min-h-11 text-sm font-medium px-4 rounded-[var(--dash-radius-sm)] border border-white/20 text-dash-text hover:bg-white/5 transition-colors self-start xl:self-auto`}
+          >
+            Clear both sides
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={clearAll}
-          className="self-start sm:self-auto min-h-11 text-sm font-medium px-4 rounded-[var(--dash-radius-sm)] border border-white/20 text-dash-text hover:bg-white/5 transition-colors"
-        >
-          Clear both sides
-        </button>
+        <p className="text-xs text-dash-text/50 leading-relaxed">
+          {leagueSize}-team · {ppr === 1 ? "Full PPR" : ppr === 0.5 ? "Half PPR" : "Non-PPR"} — display context only;
+          trade points still use the Sleeper search rank + trending-adds heuristic.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
+        <TeamSide
+          side={1}
+          title="Team 1"
+          description="Assets on this side of the trade."
+          lines={t1Resolved}
+          superflex={superflex}
+          flashTick={flashTicks[1]}
+          onRemove={(lineId) => removeFrom(1, lineId)}
+        />
+        <TeamSide
+          side={2}
+          title="Team 2"
+          description="Assets on this side of the trade."
+          lines={t2Resolved}
+          superflex={superflex}
+          flashTick={flashTicks[2]}
+          onRemove={(lineId) => removeFrom(2, lineId)}
+        />
       </div>
 
       <section
         aria-labelledby="trade-search-heading"
-        className="dash-glass-panel rounded-[var(--dash-radius-md)] p-4 sm:p-6 space-y-4 ring-1 ring-white/[0.06]"
+        className="dash-glass-panel rounded-[var(--dash-radius-md)] p-4 sm:p-6 space-y-4"
       >
         <h2 id="trade-search-heading" className="text-base font-semibold text-dash-text">
           Add players or picks
@@ -233,7 +310,11 @@ export function TradeCalculator() {
               key={asset.id}
               className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-3 py-3 bg-black/20 hover:bg-white/[0.06] transition-colors"
             >
-              <div className="min-w-0 flex-1">
+              <div className="min-w-0 flex-1 flex items-start gap-3">
+                {asset.kind === "player" ? (
+                  <PlayerHeadshot imageUrl={asset.imageUrl} name={asset.name} />
+                ) : null}
+                <div className="min-w-0 flex-1">
                 <p className="font-medium text-dash-text truncate">{asset.name}</p>
                 <p className="text-xs font-mono text-dash-text/60">
                   {asset.kind === "pick"
@@ -246,26 +327,29 @@ export function TradeCalculator() {
                       · Sleeper search rank {asset.sleeperSearchRank ?? "—"} · adds {asset.sleeperTrendingAdds ?? 0}
                     </span>
                   ) : null}
-                  {superflex && asset.position === "QB" ? (
+                  {superflex &&
+                  asset.kind === "player" &&
+                  catalogPositionIncludesQb(asset.position) ? (
                     <span className="text-dash-success">
                       {" "}
                       → eff. {effectiveValue(asset, { superflex }).toLocaleString()}
                     </span>
                   ) : null}
                 </p>
+                </div>
               </div>
               <div className="flex flex-wrap shrink-0 gap-2">
                 <button
                   type="button"
-                  onClick={() => addTo(1, asset.id)}
-                  className="min-h-11 text-xs font-semibold px-3 rounded-[var(--dash-radius-sm)] bg-dash-primary text-dash-text hover:bg-dash-primary/90 transition-colors"
+                  onClick={() => addTo(1, asset.id, asset.name)}
+                  className={`${btnPress} min-h-11 text-xs font-semibold px-3 rounded-[var(--dash-radius-sm)] bg-dash-primary text-dash-text hover:bg-dash-primary/90 transition-colors`}
                 >
                   Add to team 1
                 </button>
                 <button
                   type="button"
-                  onClick={() => addTo(2, asset.id)}
-                  className="min-h-11 text-xs font-semibold px-3 rounded-[var(--dash-radius-sm)] border border-dash-secondary/60 bg-dash-secondary/40 text-dash-text hover:bg-dash-secondary/60 transition-colors"
+                  onClick={() => addTo(2, asset.id, asset.name)}
+                  className={`${btnPress} min-h-11 text-xs font-semibold px-3 rounded-[var(--dash-radius-sm)] border border-dash-secondary/60 bg-dash-secondary/40 text-dash-text hover:bg-dash-secondary/60 transition-colors`}
                 >
                   Add to team 2
                 </button>
@@ -277,27 +361,6 @@ export function TradeCalculator() {
           <p className="text-sm text-dash-text/60">No matches. Try another search.</p>
         ) : null}
       </section>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
-        <TeamSide
-          side={1}
-          title="Team 1"
-          description="Assets on this side of the trade."
-          lines={t1Resolved}
-          superflex={superflex}
-          onRemove={(lineId) => removeFrom(1, lineId)}
-        />
-        <TeamSide
-          side={2}
-          title="Team 2"
-          description="Assets on this side of the trade."
-          lines={t2Resolved}
-          superflex={superflex}
-          onRemove={(lineId) => removeFrom(2, lineId)}
-        />
-      </div>
-
-      <TotalsSummary total1={total1} total2={total2} />
     </div>
   );
 }

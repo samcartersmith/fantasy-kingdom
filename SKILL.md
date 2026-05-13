@@ -87,3 +87,35 @@ When generating design-system guidance, use this structure:
 - If introducing a new pattern, include migration guidance for existing components.
 
 <!-- TYPEUI_SH_MANAGED_END -->
+
+## Fantasy Kingdom (project implementation)
+
+This section extends the Dashboard skill for **this repo only**. Do not edit the TypeUI-managed block above when updating universal copy.
+
+### Tokens ([`src/app/globals.css`](src/app/globals.css))
+
+- **`--dash-border`**: 1px border on `.dash-glass-panel`; stronger edge on the dark surface (currently higher white alpha than the legacy 0.1 default).
+- **`--dash-ring`**: optional semantic ring color for Tailwind via `--color-dash-ring` in `@theme inline` (use `ring-dash-ring` / `border-dash-border` when aligning utilities with panels).
+- **`--dash-glass`**: panel fill; keep hierarchy: surface, then glass fill, then border.
+
+### Glass panels
+
+- Prefer **one** edge treatment: `.dash-glass-panel` already sets `border: 1px solid var(--dash-border)`. Avoid stacking faint `ring-white/[0.06]` on the same node unless there is a deliberate double-rim design.
+- Accent rings (e.g. comparison `ring-dash-primary/25`, error `ring-dash-danger`) are intentional exceptions.
+
+### Interaction and motion
+
+- **Primary actions** (e.g. trade "Add to team", ranking tabs, primary `Link` buttons): use `cursor-pointer`, `motion-safe:transition` + `motion-safe:duration-150`, and `motion-safe:active:scale-[0.97]` (or similar) for press feedback.
+- **`prefers-reduced-motion`**: global rules shorten transitions/animations; do not rely on looping decorative motion. Purposeful feedback (e.g. one-shot add highlight) should still allow **`aria-live="polite"`** announcements.
+- Keep **focus-visible** rings on interactive controls (outline/focus ring patterns unchanged).
+
+### Trade calculator ([`src/components/trade/TradeCalculator.tsx`](src/components/trade/TradeCalculator.tsx), [`src/components/trade/TeamSide.tsx`](src/components/trade/TeamSide.tsx))
+
+- **Add to team**: increments a per-side `flashTick` passed to `TeamSide`; the panel runs the **`dash-animate-team-flash`** class (keyframes `dash-team-flash` in globals) under `prefers-reduced-motion: no-preference`.
+- **Screen readers**: hidden live region announces `Added {name} to Team {n}.` on each add (`aria-live="polite"`, `aria-atomic="true"`).
+
+### QA (code review)
+
+- Panel borders use the token; no accidental double-faint rings on `dash-glass-panel`.
+- Buttons show pointer + press affordance; reduced-motion users still get live text for trade adds.
+- Focus states remain visible on keyboard nav.
