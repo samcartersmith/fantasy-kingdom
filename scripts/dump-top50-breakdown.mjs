@@ -1,9 +1,10 @@
 /**
- * Export top N players by modeled trade value to CSV with one column per score component.
+ * Export top N players by modeled trade value to HTML (default) or CSV — one column per score component.
  *
  * Usage:
  *   node scripts/dump-top50-breakdown.mjs
- *   node scripts/dump-top50-breakdown.mjs --out output/top50.csv --limit 50 --superflex 0 --ppr 1 --league-size 12
+ *   node scripts/dump-top50-breakdown.mjs --format csv --out output/top50.csv
+ *   node scripts/dump-top50-breakdown.mjs --limit 50 --superflex 0 --ppr 1 --league-size 12
  *
  * Requires network for Sleeper players + trending adds (same lookback as trade catalog API).
  */
@@ -48,6 +49,22 @@ const MISSING_KEYS = [
   "missing_futureOutlook",
 ];
 
+const HEADER = [
+  "rank",
+  "sleeperPlayerId",
+  "name",
+  "team",
+  "position",
+  "finalValue",
+  "confidence01",
+  "preClampSum",
+  "league_superflex",
+  "league_ppr",
+  "league_size",
+  ...COMPONENT_KEYS,
+  ...MISSING_KEYS,
+];
+
 function getJson(url) {
   return new Promise((resolve, reject) => {
     https
@@ -90,7 +107,8 @@ function skillPositionsDisplay(positions) {
 
 function parseArgs(argv) {
   const out = {
-    out: path.join(__dirname, "..", "output", "top50-player-score-breakdown.csv"),
+    format: "html",
+    out: null,
     limit: 50,
     superflex: false,
     ppr: 1,
@@ -98,17 +116,23 @@ function parseArgs(argv) {
   };
   for (let i = 2; i < argv.length; i++) {
     const a = argv[i];
-    if (a === "--out") out.out = argv[++i];
+    if (a === "--format") {
+      const f = String(argv[++i] || "").toLowerCase();
+      if (f === "csv" || f === "html") out.format = f;
+    } else if (a === "--out") out.out = argv[++i];
     else if (a === "--limit") out.limit = Math.max(1, Number(argv[++i]) || 50);
     else if (a === "--superflex") out.superflex = argv[++i] === "1";
     else if (a === "--ppr") {
       const v = argv[++i];
       out.ppr = v === "0" ? 0 : v === "0.5" ? 0.5 : 1;
-    }
-    else if (a === "--league-size") {
+    } else if (a === "--league-size") {
       const n = Number(argv[++i]);
       if (n === 8 || n === 10 || n === 12 || n === 14) out.leagueSize = n;
     }
+  }
+  if (!out.out) {
+    const base = path.join(__dirname, "..", "output", "top50-player-score-breakdown");
+    out.out = out.format === "csv" ? `${base}.csv` : `${base}.html`;
   }
   return out;
 }
@@ -117,6 +141,14 @@ function csvEscape(s) {
   const t = String(s);
   if (/[",\n\r]/.test(t)) return `"${t.replace(/"/g, '""')}"`;
   return t;
+}
+
+function htmlEscape(s) {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 function contributionMap(components) {
@@ -143,6 +175,108 @@ function missingFlags(components) {
     if (col && c.missing) out[col] = 1;
   }
   return out;
+}
+
+function buildRowObjects(top, league) {
+  let rank = 1;
+  const rows = [];
+  for (const row of top) {
+    const cmap = contributionMap(row.components);
+    const miss = missingFlags(row.components);
+    const rec = {
+      rank: rank++,
+      sleeperPlayerId: row.pidStr,
+      name: row.name,
+      team: row.team,
+      position: row.position,
+      finalValue: row.value,
+      confidence01: row.confidence01.toFixed(4),
+      preClampSum: Math.round(row.preClampSum),
+      league_superflex: league.superflex ? 1 : 0,
+      league_ppr: league.ppr,
+      league_size: league.leagueSize,
+    };
+    for (const k of COMPONENT_KEYS) {
+      if (cmap[k] === undefined) rec[k] = "";
+      else rec[k] = Math.round(cmap[k] * 100) / 100;
+    }
+    for (const k of MISSING_KEYS) rec[k] = miss[k] ?? 0;
+    rows.push(rec);
+  }
+  return rows;
+}
+
+function writeCsv(outPath, rows) {
+  const lines = [HEADER.join(",")];
+  for (const rec of rows) {
+    const cells = HEADER.map((h) => rec[h]);
+    lines.push(cells.map(csvEscape).join(","));
+  }
+  fs.writeFileSync(outPath, lines.join("\n"), "utf8");
+}
+
+function writeHtml(outPath, rows, meta) {
+  const th = (key) => `<th scope="col">${htmlEscape(key)}</th>`;
+  const numericHint = new Set([
+    ...COMPONENT_KEYS,
+    "finalValue",
+    "preClampSum",
+    "league_superflex",
+    "league_ppr",
+    "league_size",
+    ...MISSING_KEYS,
+  ]);
+  const bodyRows = rows
+    .map(
+      (rec, i) =>
+        `<tr class="${i % 2 === 0 ? "even" : "odd"}">${HEADER.map((h) => {
+          const v = rec[h];
+          const cls = numericHint.has(h) ? "num" : "";
+          return `<td class="${cls}">${htmlEscape(v === "" ? "—" : String(v))}</td>`;
+        }).join("")}</tr>`,
+    )
+    .join("\n");
+
+  const doc = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Top ${rows.length} players — trade score breakdown</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: ui-sans-serif, system-ui, sans-serif; margin: 1rem 1.25rem 2rem; line-height: 1.4; }
+    h1 { font-size: 1.15rem; font-weight: 600; margin-bottom: 0.35rem; }
+    .meta { font-size: 0.85rem; opacity: 0.85; margin-bottom: 1rem; }
+    .wrap { overflow-x: auto; border: 1px solid color-mix(in srgb, CanvasText 18%, transparent); border-radius: 8px; }
+    table { border-collapse: collapse; font-size: 12px; min-width: max-content; }
+    th, td { border-bottom: 1px solid color-mix(in srgb, CanvasText 12%, transparent); padding: 0.35rem 0.5rem; text-align: left; vertical-align: top; }
+    th { position: sticky; top: 0; background: Canvas; z-index: 1; font-weight: 600; white-space: nowrap; }
+    tr.even { background: color-mix(in srgb, Canvas 92%, CanvasText 4%); }
+    td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    th.num { text-align: right; }
+  </style>
+</head>
+<body>
+  <h1>Top ${rows.length} players — trade score breakdown</h1>
+  <div class="meta">
+    Generated ${htmlEscape(meta.generatedAt)} ·
+    League: PPR=${meta.ppr}, size=${meta.leagueSize}, superflex=${meta.superflex} ·
+    Fantasy snapshot: ${htmlEscape(meta.fantasySnapshotAsOf)} ·
+    Curated snapshot: ${htmlEscape(meta.curatedSnapshotAsOf)}
+  </div>
+  <div class="wrap">
+    <table>
+      <thead><tr>${HEADER.map((h) => (numericHint.has(h) ? `<th scope="col" class="num">${htmlEscape(h)}</th>` : th(h))).join("")}</tr></thead>
+      <tbody>
+${bodyRows}
+      </tbody>
+    </table>
+  </div>
+</body>
+</html>
+`;
+  fs.writeFileSync(outPath, doc, "utf8");
 }
 
 async function main() {
@@ -209,53 +343,22 @@ async function main() {
 
   scored.sort((a, b) => b.value - a.value);
   const top = scored.slice(0, opts.limit);
+  const rows = buildRowObjects(top, league);
 
-  const header = [
-    "rank",
-    "sleeperPlayerId",
-    "name",
-    "team",
-    "position",
-    "finalValue",
-    "confidence01",
-    "preClampSum",
-    "league_superflex",
-    "league_ppr",
-    "league_size",
-    ...COMPONENT_KEYS,
-    ...MISSING_KEYS,
-  ];
-
-  const lines = [header.join(",")];
-  let rank = 1;
-  for (const row of top) {
-    const cmap = contributionMap(row.components);
-    const miss = missingFlags(row.components);
-    const cells = [
-      rank++,
-      row.pidStr,
-      row.name,
-      row.team,
-      row.position,
-      row.value,
-      row.confidence01.toFixed(4),
-      Math.round(row.preClampSum),
-      league.superflex ? 1 : 0,
-      league.ppr,
-      league.leagueSize,
-      ...COMPONENT_KEYS.map((k) => {
-        if (cmap[k] === undefined) return "";
-        const v = cmap[k];
-        return Math.round(v * 100) / 100;
-      }),
-      ...MISSING_KEYS.map((k) => miss[k] ?? 0),
-    ];
-    lines.push(cells.map(csvEscape).join(","));
-  }
+  const meta = {
+    generatedAt: new Date().toISOString(),
+    ppr: league.ppr,
+    leagueSize: league.leagueSize,
+    superflex: league.superflex,
+    fantasySnapshotAsOf: fantasy.snapshotAsOf ?? "—",
+    curatedSnapshotAsOf: curated.snapshotAsOf ?? "—",
+  };
 
   fs.mkdirSync(path.dirname(opts.out), { recursive: true });
-  fs.writeFileSync(opts.out, lines.join("\n"), "utf8");
-  console.error(`Wrote ${top.length} rows to ${opts.out}`);
+  if (opts.format === "csv") writeCsv(opts.out, rows);
+  else writeHtml(opts.out, rows, meta);
+
+  console.error(`Wrote ${top.length} rows (${opts.format}) to ${opts.out}`);
 }
 
 main().catch((e) => {
