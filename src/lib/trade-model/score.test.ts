@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   buildFpAnchors,
+  productionBaseTradePoints,
+  stretchCombinedNorm01,
   type PlayerFantasyProfile,
 } from "@/lib/trade-model/fp-baseline";
 import { scorePlayer } from "@/lib/trade-model/score-player";
@@ -117,6 +119,40 @@ describe("scorePlayer", () => {
     const lowBuzz = buzzTweakPoints(2000, 0, BUZZ_MAX_POINTS);
     const highBuzz = buzzTweakPoints(1, 120, BUZZ_MAX_POINTS);
     expect(Math.abs(highBuzz - lowBuzz)).toBeLessThanOrEqual(2 * BUZZ_MAX_POINTS + 5);
+  });
+});
+
+describe("stretchCombinedNorm01", () => {
+  it("expands separation in the elite band vs identity mapping", () => {
+    const a = stretchCombinedNorm01(0.86);
+    const b = stretchCombinedNorm01(0.94);
+    expect(b - a).toBeGreaterThan(0.94 - 0.86);
+  });
+});
+
+describe("productionBaseTradePoints elite tail", () => {
+  it("assigns meaningfully wider basePoints between two high-end WR profiles than raw norm delta alone", () => {
+    const profiles: Record<string, PlayerFantasyProfile> = {
+      ...Object.fromEntries(
+        [40, 55, 70, 85, 100, 115, 130, 145].map((p, i) => [
+          `fill_${i}`,
+          { primaryPosition: "WR" as const, seasons: { "2024": wrSeason(p), "2023": wrSeason(Math.max(30, p - 20)) } },
+        ]),
+      ),
+      eliteA: {
+        primaryPosition: "WR",
+        seasons: { "2024": wrSeason(300), "2023": wrSeason(260) },
+      },
+      eliteB: {
+        primaryPosition: "WR",
+        seasons: { "2024": wrSeason(390), "2023": wrSeason(340) },
+      },
+    };
+    const anchors = buildFpAnchors(profiles, 1);
+    const a = productionBaseTradePoints(profiles.eliteA, "WR", 1, anchors);
+    const b = productionBaseTradePoints(profiles.eliteB, "WR", 1, anchors);
+    expect(b.basePoints).toBeGreaterThan(a.basePoints);
+    expect(b.basePoints - a.basePoints).toBeGreaterThan(400);
   });
 });
 
