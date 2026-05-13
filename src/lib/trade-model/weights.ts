@@ -64,11 +64,13 @@ export function futureOutlookRaw(input: {
 }): { value01: number; missing: boolean } {
   const parts: number[] = [];
   if (!input.missingAge) parts.push(input.age01);
-  if (!input.missingTeam) parts.push(input.team01);
+  // Unknown team tier uses the same neutral prior as an explicit 0.5 offense tier for this blend only.
+  parts.push(input.missingTeam ? NEUTRAL : input.team01);
   if (!input.missingRole) parts.push(input.role01);
   if (parts.length === 0) return { value01: NEUTRAL, missing: true };
   const v = parts.reduce((a, b) => a + b, 0) / parts.length;
-  return { value01: v, missing: false };
+  const allMissing = input.missingAge && input.missingTeam && input.missingRole;
+  return { value01: v, missing: allMissing };
 }
 
 export function applyLeagueFormatToPlayerValue(
