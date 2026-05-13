@@ -13,6 +13,8 @@ export type CatalogAsset = {
   sleeperPlayerId?: string;
   /** Headshot URL from Sleeper CDN; players only. */
   imageUrl?: string | null;
+  /** Best-effort age in years from Sleeper; players only. */
+  age?: number | null;
   /** Sleeper in-app search rank when present (lower ≈ more searched). */
   sleeperSearchRank?: number | null;
   /** Recent add count from Sleeper trending (window set in API). */
@@ -28,10 +30,21 @@ export type LineItem = {
 
 export const SUPERFLEX_QB_MULTIPLIER = 1.22;
 
+/** Skill tokens that appear in catalog `position` strings (comma-separated). */
+export type CatalogSkillPosition = "QB" | "RB" | "WR" | "TE";
+
+/** True when catalog position string lists the given skill (e.g. `RB` or `WR,RB`). */
+export function catalogPlayerHasSkillPosition(
+  position: string | null,
+  skill: CatalogSkillPosition,
+): boolean {
+  if (!position) return false;
+  return position.split(",").some((p) => p.trim().toUpperCase() === skill);
+}
+
 /** True when catalog position string lists QB (e.g. `QB` or `QB,TE`). */
 export function catalogPositionIncludesQb(position: string | null): boolean {
-  if (!position) return false;
-  return position.split(",").some((p) => p.trim().toUpperCase() === "QB");
+  return catalogPlayerHasSkillPosition(position, "QB");
 }
 
 export function effectiveValue(

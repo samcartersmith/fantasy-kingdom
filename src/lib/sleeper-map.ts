@@ -42,6 +42,7 @@ export function sleeperPlayersMapToCatalog(
     const ta = trendingAdds.get(String(pid)) ?? 0;
     const value = tradeValueFromSleeperSignals(sr, ta);
     const pidStr = String(pid);
+    const age = resolvePlayerAgeYears(raw.age, raw.years_exp);
 
     out.push({
       id: `sleeper_${pidStr}`,
@@ -54,6 +55,7 @@ export function sleeperPlayersMapToCatalog(
       imageUrl: `https://sleepercdn.com/content/nfl/players/${pidStr}.jpg`,
       sleeperSearchRank: sr,
       sleeperTrendingAdds: ta,
+      age,
     });
   }
 
@@ -121,6 +123,7 @@ export function sleeperPlayersMapToCatalogModeled(
       imageUrl: `https://sleepercdn.com/content/nfl/players/${pidStr}.jpg`,
       sleeperSearchRank: sr,
       sleeperTrendingAdds: ta,
+      age,
       evaluation: { confidence01: scored.confidence01, components: scored.components },
     });
   }

@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export function SiteHeader() {
   return (
-    <header className="dash-glass-panel border-x-0 border-t-0 rounded-none sticky top-0 z-10 border-b border-white/10">
+    <header className="sticky top-0 z-20 shrink-0 border-b border-white/10 bg-dash-surface">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 min-h-14 flex items-center justify-between gap-4">
         <Link
           href="/"
