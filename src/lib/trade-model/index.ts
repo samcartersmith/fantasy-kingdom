@@ -17,7 +17,15 @@ export { scorePlayer } from "@/lib/trade-model/score-player";
 export { scorePick } from "@/lib/trade-model/score-pick";
 export { resolvePlayerAgeYears, ageCurve01 } from "@/lib/trade-model/age-curve";
 export { tryParsePickId } from "@/lib/trade-model/pick-parse";
-export { buildFpAnchors, productionBaseTradePoints, weightedPpg, weightedSeasonTotals } from "@/lib/trade-model/fp-baseline";
+export {
+  buildFpAnchors,
+  productionBaseTradePoints,
+  weightedPpg,
+  weightedSeasonTotals,
+  fpRecencyWeights,
+  presentFpSeasonKeysDesc,
+  FP_SEASON_ORDER_DESC,
+} from "@/lib/trade-model/fp-baseline";
 export type {
   FantasyProfilePayload,
   FpAnchors,

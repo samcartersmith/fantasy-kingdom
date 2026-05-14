@@ -1,5 +1,7 @@
 /** Official Sleeper read-only API — no key required. @see https://docs.sleeper.com */
-export const SLEEPER_NFL_PLAYERS_URL = "https://api.sleeper.app/v1/players/nfl";
+export const SLEEPER_API_V1_BASE = "https://api.sleeper.app/v1";
+
+export const SLEEPER_NFL_PLAYERS_URL = `${SLEEPER_API_V1_BASE}/players/nfl`;
 
 /** Per Sleeper docs: avoid hitting players/nfl more than about once per day (large payload). */
 export const SLEEPER_PLAYERS_REVALIDATE_SECONDS = 86_400;
@@ -12,5 +14,5 @@ export function sleeperTrendingAddsUrl(limit: number, lookbackHours: number): st
     limit: String(limit),
     lookback_hours: String(lookbackHours),
   });
-  return `https://api.sleeper.app/v1/players/nfl/trending/add?${q.toString()}`;
+  return `${SLEEPER_API_V1_BASE}/players/nfl/trending/add?${q.toString()}`;
 }

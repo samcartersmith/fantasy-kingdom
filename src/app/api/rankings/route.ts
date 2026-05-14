@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fetchSleeperNflPlayersMap, fetchSleeperTrendingAdds } from "@/lib/sleeper-fetch";
 import { buildSleeperRankingRows } from "@/lib/sleeper-ranking";
-import { SLEEPER_TRENDING_REVALIDATE_SECONDS } from "@/lib/sleeper-constants";
 
-/** Revalidate this route when trending data is expected to refresh. */
-export const revalidate = SLEEPER_TRENDING_REVALIDATE_SECONDS;
+/** Revalidate this route when trending data is expected to refresh (keep in sync with `SLEEPER_TRENDING_REVALIDATE_SECONDS`). */
+export const revalidate = 3600;
 
 const ALLOWED = new Set(["ALL", "QB", "RB", "WR", "TE"]);
 

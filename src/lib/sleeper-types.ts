@@ -11,8 +11,10 @@ export type SleeperNflPlayer = {
   team?: string | null;
   status?: string | null;
   sport?: string | null;
-  /** Sleeper in-app search ordering hint; lower values tend to be more searched players. */
+  /** Search popularity rank when Sleeper exposes it (lower = more searched). */
   search_rank?: number | null;
+  /** NFL GSIS id when known; trim before joining to nflverse `player_id`. */
+  gsis_id?: string | null;
   years_exp?: number | null;
   /** Numeric age in years when Sleeper provides it. */
   age?: number | null;

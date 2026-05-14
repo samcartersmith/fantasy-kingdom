@@ -1,6 +1,8 @@
 /**
- * Aggregates Sleeper regular-season player stats into a checked-in snapshot for the trade model.
- * Run manually when refreshing data: `node scripts/build-fantasy-profiles.mjs`
+ * Optional Sleeper-only fantasy stat rollup for **comparison / diff** against the canonical nflverse profile.
+ * The trade app loads `player-fantasy-profile.json` from `npm run data:fantasy` (nflverse builder), not this file.
+ *
+ * Run: npm run data:fantasy:sleeper
  *
  * Sources (read-only, no key):
  * - GET https://api.sleeper.app/v1/players/nfl
@@ -67,15 +69,20 @@ function seasonRow(statsObj, pid) {
 }
 
 async function main() {
-  const outPath = path.join("src", "data", "trade-model", "player-fantasy-profile.json");
-  const [playersMap, stats2023, stats2024] = await Promise.all([
+  const outPath = path.join("src", "data", "trade-model", "player-fantasy-profile.sleeper.json");
+  const [playersMap, stats2023, stats2024, stats2025] = await Promise.all([
     getJson("https://api.sleeper.app/v1/players/nfl"),
     getJson("https://api.sleeper.app/v1/stats/nfl/regular/2023?season_type=regular&week=18"),
     getJson("https://api.sleeper.app/v1/stats/nfl/regular/2024?season_type=regular&week=18"),
+    getJson("https://api.sleeper.app/v1/stats/nfl/regular/2025?season_type=regular&week=18"),
   ]);
 
   const profiles = {};
-  const allPids = new Set([...Object.keys(stats2023), ...Object.keys(stats2024)]);
+  const allPids = new Set([
+    ...Object.keys(stats2023),
+    ...Object.keys(stats2024),
+    ...Object.keys(stats2025),
+  ]);
 
   for (const pid of allPids) {
     if (!/^\d+$/.test(pid)) continue;
@@ -86,11 +93,13 @@ async function main() {
 
     const s23 = seasonRow(stats2023, pid);
     const s24 = seasonRow(stats2024, pid);
-    if (!s23 && !s24) continue;
+    const s25 = seasonRow(stats2025, pid);
+    if (!s23 && !s24 && !s25) continue;
 
     const seasons = {};
     if (s23) seasons["2023"] = s23;
     if (s24) seasons["2024"] = s24;
+    if (s25) seasons["2025"] = s25;
 
     profiles[pid] = {
       primaryPosition: pos,
@@ -100,7 +109,8 @@ async function main() {
 
   const payload = {
     snapshotAsOf: new Date().toISOString().slice(0, 10),
-    source: "Sleeper regular season stats (week 18 rollup) + players/nfl for position",
+    source:
+      "Sleeper regular season stats (week 18 rollup) + players/nfl for position — optional diff artifact only",
     profiles,
   };
 

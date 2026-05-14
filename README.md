@@ -29,8 +29,10 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000). Tools: [`/trade`](http://localhost:3000/trade), [`/rankings`](http://localhost:3000/rankings).
 
+Fantasy production snapshot: `npm run data:fantasy` (nflverse CSVs + Sleeper id join). Optional Sleeper-only rollup for comparison: `npm run data:fantasy:sleeper` then `npm run data:fantasy:diff` (see [`docs/nflverse-scoring-parity.md`](docs/nflverse-scoring-parity.md)).
+
 ## Design skill
 
 [`SKILL.md`](SKILL.md) is the TypeUI **Dashboard** design skill. Refresh it with `npx typeui.sh pull dashboard` when the CLI is available, or replace the file manually.
 
-Draft pick chips in [`src/data/players-picks.json`](src/data/players-picks.json) use **local demo values**. NFL players come from Sleeper [`GET /v1/players/nfl`](https://docs.sleeper.com). **Rankings** ([`/rankings`](src/app/rankings/page.tsx), API [`/api/rankings`](src/app/api/rankings/route.ts)) sort by Sleeper `search_rank` and blend in [`/players/nfl/trending/add`](https://docs.sleeper.com); **trade catalog player values** use the fair-trade model (fantasy stat snapshot plus smaller nudges; see [`docs/how-player-trade-score-is-calculated.md`](docs/how-player-trade-score-is-calculated.md)). Refresh fantasy snapshot data with `npm run data:fantasy`.
+Draft pick chips in [`src/data/players-picks.json`](src/data/players-picks.json) use **local demo values**. NFL players come from Sleeper [`GET /v1/players/nfl`](https://docs.sleeper.com). **Rankings** ([`/rankings`](src/app/rankings/page.tsx), API [`/api/rankings`](src/app/api/rankings/route.ts)) sort by Sleeper `search_rank` and blend in [`/players/nfl/trending/add`](https://docs.sleeper.com); **trade catalog player values** use the fair-trade model (nflverse-backed fantasy snapshot plus smaller nudges; see [`docs/how-player-trade-score-is-calculated.md`](docs/how-player-trade-score-is-calculated.md)). Refresh the checked-in snapshot with `npm run data:fantasy`.

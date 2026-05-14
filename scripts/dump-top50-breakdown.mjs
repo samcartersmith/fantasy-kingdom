@@ -1,10 +1,13 @@
 /**
  * Export top N players by modeled trade value to HTML (default) or CSV — one column per score component.
+ * By default also writes a sibling `*-extended.*` file: same component columns plus FP spine (weighted pts,
+ * per-season pts/games, norms) and raw Sleeper inputs (search rank, trending adds, age) for tuning / planning.
  *
  * Usage:
  *   node scripts/dump-top50-breakdown.mjs
  *   node scripts/dump-top50-breakdown.mjs --format csv --out output/top50.csv
  *   node scripts/dump-top50-breakdown.mjs --limit 50 --superflex 0 --ppr 1 --league-size 12
+ *   node scripts/dump-top50-breakdown.mjs --no-extended
  *
  * Requires network for Sleeper players + trending adds (same lookback as trade catalog API).
  */
@@ -17,8 +20,11 @@ import {
   createProviders,
   displayName,
   loadRepoJson,
+  productionBaseTradePoints,
   resolveAge,
   scorePlayerDetailed,
+  weightedPpg,
+  weightedSeasonTotals,
 } from "./trade-score-dump-shared.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -49,6 +55,29 @@ const MISSING_KEYS = [
   "missing_futureOutlook",
 ];
 
+/** Same season window as `trade-score-dump-shared.mjs` / `fp-baseline.ts` (newest first). */
+const FP_SEASON_KEYS = ["2025", "2024", "2023"];
+
+const EXTENDED_KEYS = [
+  "input_search_rank",
+  "input_trending_adds_72h",
+  "input_age_years",
+  "input_years_exp",
+  "fp_weighted_pts_ppr",
+  "fp_seasons_used",
+  "fp_wppg",
+  "fp_games_weight",
+  "fp_combined_norm01",
+  "fp_games_participation01",
+  "fp_missing",
+  "fp_pts_2025",
+  "fp_gp_2025",
+  "fp_pts_2024",
+  "fp_gp_2024",
+  "fp_pts_2023",
+  "fp_gp_2023",
+];
+
 const HEADER = [
   "rank",
   "sleeperPlayerId",
@@ -64,6 +93,8 @@ const HEADER = [
   ...COMPONENT_KEYS,
   ...MISSING_KEYS,
 ];
+
+const EXTENDED_HEADER = [...HEADER, ...EXTENDED_KEYS];
 
 function getJson(url) {
   return new Promise((resolve, reject) => {
@@ -113,6 +144,8 @@ function parseArgs(argv) {
     superflex: false,
     ppr: 1,
     leagueSize: 12,
+    /** When true, also writes `*-extended.{csv,html}` with FP + Sleeper inputs alongside component columns. */
+    extended: true,
   };
   for (let i = 2; i < argv.length; i++) {
     const a = argv[i];
@@ -120,6 +153,7 @@ function parseArgs(argv) {
       const f = String(argv[++i] || "").toLowerCase();
       if (f === "csv" || f === "html") out.format = f;
     } else if (a === "--out") out.out = argv[++i];
+    else if (a === "--no-extended") out.extended = false;
     else if (a === "--limit") out.limit = Math.max(1, Number(argv[++i]) || 50);
     else if (a === "--superflex") out.superflex = argv[++i] === "1";
     else if (a === "--ppr") {
@@ -206,19 +240,72 @@ function buildRowObjects(top, league) {
   return rows;
 }
 
-function writeCsv(outPath, rows) {
-  const lines = [HEADER.join(",")];
+function fpSeasonPtsGames(profile, ppr, year) {
+  if (!profile?.seasons?.[year]) return { pts: "", gp: "" };
+  const r = profile.seasons[year];
+  const pts =
+    ppr >= 1 ? r.pts_ppr : ppr >= 0.5 ? r.pts_half_ppr : r.pts_std;
+  const gp = r.games ?? "";
+  return { pts: Number.isFinite(pts) ? Math.round(pts * 100) / 100 : "", gp };
+}
+
+function buildExtendedRowObjects(top, league, fp) {
+  const base = buildRowObjects(top, league);
+  const out = [];
+  for (let i = 0; i < top.length; i++) {
+    const row = top[i];
+    const rec = { ...base[i] };
+    const raw = row.sleeperRaw;
+    const sr =
+      typeof raw.search_rank === "number" && Number.isFinite(raw.search_rank) && raw.search_rank > 0
+        ? raw.search_rank
+        : "";
+    const ta = row.trendingAdds72h ?? 0;
+    const age = resolveAge(raw);
+    const yexp =
+      typeof raw.years_exp === "number" && Number.isFinite(raw.years_exp) ? raw.years_exp : "";
+
+    const profile = fp.profiles[row.pidStr];
+    const wst = profile ? weightedSeasonTotals(profile, league.ppr) : { weightedPts: 0, seasonsUsed: 0 };
+    const wpg = profile ? weightedPpg(profile, league.ppr) : { wppg: 0, gamesWeight: 0 };
+    const prod = productionBaseTradePoints(profile, fp.anchors, league.ppr);
+
+    rec.input_search_rank = sr === "" ? "" : sr;
+    rec.input_trending_adds_72h = ta;
+    rec.input_age_years = age == null ? "" : age;
+    rec.input_years_exp = yexp;
+    rec.fp_weighted_pts_ppr = Math.round(wst.weightedPts * 100) / 100;
+    rec.fp_seasons_used = wst.seasonsUsed;
+    rec.fp_wppg = Math.round(wpg.wppg * 1000) / 1000;
+    rec.fp_games_weight = Math.round(wpg.gamesWeight * 100) / 100;
+    rec.fp_combined_norm01 = Math.round(prod.combinedNorm01 * 10000) / 10000;
+    rec.fp_games_participation01 = Math.round(prod.gamesParticipation01 * 10000) / 10000;
+    rec.fp_missing = prod.missing ? 1 : 0;
+
+    for (const y of FP_SEASON_KEYS) {
+      const { pts, gp } = fpSeasonPtsGames(profile, league.ppr, y);
+      rec[`fp_pts_${y}`] = pts;
+      rec[`fp_gp_${y}`] = gp;
+    }
+    out.push(rec);
+  }
+  return out;
+}
+
+function writeCsv(outPath, rows, header = HEADER) {
+  const lines = [header.join(",")];
   for (const rec of rows) {
-    const cells = HEADER.map((h) => rec[h]);
+    const cells = header.map((h) => rec[h]);
     lines.push(cells.map(csvEscape).join(","));
   }
   fs.writeFileSync(outPath, lines.join("\n"), "utf8");
 }
 
-function writeHtml(outPath, rows, meta) {
+function writeHtml(outPath, rows, meta, header = HEADER) {
   const th = (key) => `<th scope="col">${htmlEscape(key)}</th>`;
   const numericHint = new Set([
     ...COMPONENT_KEYS,
+    ...EXTENDED_KEYS,
     "finalValue",
     "preClampSum",
     "league_superflex",
@@ -229,7 +316,7 @@ function writeHtml(outPath, rows, meta) {
   const bodyRows = rows
     .map(
       (rec, i) =>
-        `<tr class="${i % 2 === 0 ? "even" : "odd"}">${HEADER.map((h) => {
+        `<tr class="${i % 2 === 0 ? "even" : "odd"}">${header.map((h) => {
           const v = rec[h];
           const cls = numericHint.has(h) ? "num" : "";
           return `<td class="${cls}">${htmlEscape(v === "" ? "—" : String(v))}</td>`;
@@ -237,12 +324,13 @@ function writeHtml(outPath, rows, meta) {
     )
     .join("\n");
 
+  const titleSuffix = header.length > HEADER.length ? " (with FP + input columns)" : "";
   const doc = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Top ${rows.length} players — trade score breakdown</title>
+  <title>Top ${rows.length} players — trade score breakdown${titleSuffix}</title>
   <style>
     :root { color-scheme: light dark; }
     body { font-family: ui-sans-serif, system-ui, sans-serif; margin: 1rem 1.25rem 2rem; line-height: 1.4; }
@@ -258,7 +346,7 @@ function writeHtml(outPath, rows, meta) {
   </style>
 </head>
 <body>
-  <h1>Top ${rows.length} players — trade score breakdown</h1>
+  <h1>Top ${rows.length} players — trade score breakdown${titleSuffix}</h1>
   <div class="meta">
     Generated ${htmlEscape(meta.generatedAt)} ·
     League: PPR=${meta.ppr}, size=${meta.leagueSize}, superflex=${meta.superflex} ·
@@ -267,7 +355,7 @@ function writeHtml(outPath, rows, meta) {
   </div>
   <div class="wrap">
     <table>
-      <thead><tr>${HEADER.map((h) => (numericHint.has(h) ? `<th scope="col" class="num">${htmlEscape(h)}</th>` : th(h))).join("")}</tr></thead>
+      <thead><tr>${header.map((h) => (numericHint.has(h) ? `<th scope="col" class="num">${htmlEscape(h)}</th>` : th(h))).join("")}</tr></thead>
       <tbody>
 ${bodyRows}
       </tbody>
@@ -337,6 +425,8 @@ async function main() {
       name: displayName(raw),
       team,
       position,
+      sleeperRaw: raw,
+      trendingAdds72h: ta,
       ...detail,
     });
   }
@@ -355,10 +445,18 @@ async function main() {
   };
 
   fs.mkdirSync(path.dirname(opts.out), { recursive: true });
-  if (opts.format === "csv") writeCsv(opts.out, rows);
-  else writeHtml(opts.out, rows, meta);
+  if (opts.format === "csv") writeCsv(opts.out, rows, HEADER);
+  else writeHtml(opts.out, rows, meta, HEADER);
 
   console.error(`Wrote ${top.length} rows (${opts.format}) to ${opts.out}`);
+
+  if (opts.extended) {
+    const extRows = buildExtendedRowObjects(top, league, fp);
+    const extPath = opts.out.replace(/\.(csv|html)$/i, "-extended.$1");
+    if (opts.format === "csv") writeCsv(extPath, extRows, EXTENDED_HEADER);
+    else writeHtml(extPath, extRows, meta, EXTENDED_HEADER);
+    console.error(`Wrote ${top.length} extended rows (${opts.format}) to ${extPath}`);
+  }
 }
 
 main().catch((e) => {
