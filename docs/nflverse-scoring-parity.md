@@ -21,7 +21,10 @@ This project’s trade model consumes **three** numeric columns per NFL season o
 
 **Important:** nflverse fantasy columns follow **nflverse’s** documented scoring rules for those fields (see the [nflreadr player stats dictionary](https://nflreadr.nflverse.com/articles/dictionary_player_stats.html)). They are **not guaranteed** to match Sleeper’s site scoring for every player-season.
 
-Sleeper is still used in this build **only** for `players/nfl`: **Sleeper player id**, **primary skill position**, and **`gsis_id`** to join nflverse `player_id`.
+Sleeper is still used in this build **only** for `players/nfl`: **Sleeper player id**, **primary skill position**, and **identity to GSIS**:
+
+- **Primary:** `gsis_id` (trimmed) equals nflverse reg-season `player_id` when Sleeper provides it.
+- **Fallback:** when `gsis_id` is null (common on newer API rows), we resolve GSIS from **nflverse `players.csv`**: normalized `display_name` + `latest_team` + `position` must match Sleeper `search_full_name` (or normalized first+last) + `team` + primary skill position.
 
 ## Optional Sleeper rollup (`npm run data:fantasy:sleeper`)
 
@@ -29,11 +32,12 @@ Sleeper is still used in this build **only** for `players/nfl`: **Sleeper player
 
 Run `npm run data:fantasy:sleeper` then [`npm run data:fantasy:diff`](../package.json) to compare canonical nflverse vs Sleeper-derived profiles.
 
-## Join key
+## Join keys
 
-Sleeper `players/nfl` entries include `gsis_id` (often with leading spaces). After **trimming** whitespace, that string should equal nflverse’s `player_id` in the reg-season player file (GSIS format such as `00-0033873`).
+1. **GSIS (preferred):** Sleeper `gsis_id` (trimmed) equals nflverse reg-season `player_id` (GSIS such as `00-0036900`).
+2. **Name / team / position (fallback):** when Sleeper omits `gsis_id`, the builder loads nflverse `players.csv` and matches `display_name` + `latest_team` + `position` to Sleeper `search_full_name` + `team` + primary skill position (same normalization as Sleeper’s search index).
 
 ## Coverage
 
-Only players with a **joinable GSIS id** and nflverse regular-season rows appear in `player-fantasy-profile.json`. That list is typically **smaller** than “all Active skill players” from Sleeper alone; everyone else still appears in the trade catalog but uses the **neutral production prior** until the join improves or curated fallbacks apply.
+Skill players who have **at least one** nflverse reg-season row after resolving GSIS (direct or fallback) appear in `player-fantasy-profile.json`. Anyone still unmatched uses the **neutral production prior** in the trade catalog until nflverse or Sleeper metadata improves.
 

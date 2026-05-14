@@ -1,16 +1,33 @@
 /** Semantic version of the explainable trade model (bump when weights or snapshot schema change). */
-export const TRADE_MODEL_VERSION = "2.0.0";
+export const TRADE_MODEL_VERSION = "2.1.0";
 
 export type PprMode = 0 | 0.5 | 1;
 
 export type LeagueSize = 8 | 10 | 12 | 14;
+
+/** Per-team starting counts for VBD-style scarcity (1–4 each). */
+export type StartingSlotCounts = {
+  startQb: 1 | 2 | 3 | 4;
+  startRb: 1 | 2 | 3 | 4;
+  startWr: 1 | 2 | 3 | 4;
+  startTe: 1 | 2 | 3 | 4;
+  startFlex: 1 | 2 | 3 | 4;
+};
+
+export const DEFAULT_STARTING_SLOTS: StartingSlotCounts = {
+  startQb: 1,
+  startRb: 2,
+  startWr: 2,
+  startTe: 1,
+  startFlex: 1,
+};
 
 /** League scoring context — all format adjustments should consume this once on the server. */
 export type LeagueContext = {
   superflex: boolean;
   ppr: PprMode;
   leagueSize: LeagueSize;
-};
+} & StartingSlotCounts;
 
 export type EvaluationComponent = {
   key: string;
@@ -36,6 +53,8 @@ export type PlayerScoreInput = {
   trendingAdds: number;
   age: number | null;
   yearsExp: number | null;
+  /** NFL draft round 1–7 when known (from nflverse players crosswalk); null = undrafted / unknown. */
+  nflDraftRound: number | null;
 };
 
 export type PickBucket = "early" | "mid" | "late";

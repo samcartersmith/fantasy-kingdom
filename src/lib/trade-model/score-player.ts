@@ -1,4 +1,4 @@
-import { ageCurve01 } from "@/lib/trade-model/age-curve";
+import { ageCurve01, peakYearsRemaining01 } from "@/lib/trade-model/age-curve";
 import {
   type FpScoringContext,
   productionBaseTradePoints,
@@ -11,6 +11,7 @@ import {
   buzzTweakPoints,
   futureOutlookRaw,
   leagueSizeTilt01,
+  nflDraftRoundTier01,
   pprReceiverTilt01,
 } from "@/lib/trade-model/weights";
 import { SUPERFLEX_QB_MULTIPLIER } from "@/lib/trade-types";
@@ -44,13 +45,45 @@ export function scorePlayer(
   const components: EvaluationComponent[] = [];
 
   const profile = fp.profiles[input.sleeperPlayerId];
-  const prod = productionBaseTradePoints(profile, input.positionLabel, league.ppr, fp.anchors);
+  const prod = productionBaseTradePoints(profile, input.positionLabel, league.ppr, fp);
 
   components.push({
     key: "fantasyProduction",
-    label: "Fantasy production (recent seasons, PPR-aware)",
+    label: "Fantasy production (recent seasons, PPR-aware + usage blend)",
     contribution: prod.basePoints,
     missing: prod.missing,
+  });
+
+  const vbdRaw = fp.vbdBySleeperId[input.sleeperPlayerId];
+  let vbdMissing = true;
+  let vbdContrib = 0;
+  if (vbdRaw != null && Number.isFinite(vbdRaw)) {
+    if (fp.vbdScale && fp.vbdScale.hi > fp.vbdScale.lo) {
+      vbdMissing = false;
+      const norm = clamp01((vbdRaw - fp.vbdScale.lo) / (fp.vbdScale.hi - fp.vbdScale.lo));
+      const baseAdj = (norm - NEUTRAL) * 2 * MODEL_WEIGHTS.vbdPoints;
+      const pk = peakYearsRemaining01(input.age, input.positionLabel);
+      const dyn = pk.missing ? 1 : 0.35 + 0.65 * pk.years01;
+      vbdContrib = Math.round(baseAdj * dyn);
+    } else {
+      vbdMissing = false;
+      vbdContrib = Math.round(Math.tanh(vbdRaw / 95) * MODEL_WEIGHTS.vbdPoints * 0.85);
+    }
+  }
+  components.push({
+    key: "vbdDynasty",
+    label: "League VBD proxy (retrospective FP vs starter baselines × peak years)",
+    contribution: vbdContrib,
+    missing: vbdMissing,
+  });
+
+  const draftT = nflDraftRoundTier01(input.nflDraftRound);
+  const draftAdj = (draftT.tier01 - NEUTRAL) * MODEL_WEIGHTS.draftCapitalPoints;
+  components.push({
+    key: "draftCapital",
+    label: "NFL draft capital (early rounds)",
+    contribution: draftAdj,
+    missing: draftT.missing,
   });
 
   if (profile && !prod.missing) {

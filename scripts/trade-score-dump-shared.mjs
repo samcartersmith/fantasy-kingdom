@@ -22,11 +22,21 @@ export const MODEL_WEIGHTS = {
   futureBlendPoints: 200,
   leagueFormatReceiverPoints: 180,
   leagueFormatSizePoints: 120,
+  vbdPoints: 400,
+  draftCapitalPoints: 160,
 };
-export const FP_BASE = { baseMin: 1400, baseSpan: 11_200, globalBlend: 0.45 };
+export const FP_BASE = { baseMin: 1400, baseSpan: 11_200, globalBlend: 0.45, richStatBlend: 0.09 };
 export const VALUE_MIN = 400;
 export const VALUE_MAX = 19_000;
 export const SKILL_ORDER = ["QB", "RB", "WR", "TE"];
+
+export const DEFAULT_STARTING_SLOTS = {
+  startQb: 1,
+  startRb: 2,
+  startWr: 2,
+  startTe: 1,
+  startFlex: 1,
+};
 
 export function stretchCombinedNorm01(raw) {
   const knee = 0.82;
@@ -138,7 +148,92 @@ export function buildFpAnchors(profiles, ppr) {
   return { positionalWppg, globalLogPts };
 }
 
-export function productionBaseTradePoints(profile, anchors, ppr) {
+export function weightedNumericFromSeasons(profile, picker) {
+  const keys = presentFpSeasonKeysDesc(profile.seasons);
+  if (keys.length === 0) return null;
+  const w = fpRecencyWeights(keys.length);
+  let acc = 0;
+  let sumW = 0;
+  for (let i = 0; i < keys.length; i++) {
+    const row = profile.seasons[keys[i]];
+    const v = picker(row);
+    if (typeof v === "number" && Number.isFinite(v)) {
+      acc += w[i] * v;
+      sumW += w[i];
+    }
+  }
+  if (sumW <= 0) return null;
+  return acc / sumW;
+}
+
+export function buildRichStatAnchors(profiles, _ppr) {
+  const wrTeShares = [];
+  const rbTpg = [];
+  const qbEpa = [];
+  for (const p of Object.values(profiles)) {
+    const primary = p.primaryPosition;
+    const ts = weightedNumericFromSeasons(p, (r) => r.target_share);
+    const tpg = weightedNumericFromSeasons(p, (r) => {
+      const g = r.games ?? 0;
+      if (g <= 0) return undefined;
+      const touches =
+        typeof r.touches === "number" && Number.isFinite(r.touches)
+          ? r.touches
+          : typeof r.carries === "number" && typeof r.targets === "number"
+            ? r.carries + r.targets
+            : undefined;
+      if (touches == null || !Number.isFinite(touches)) return undefined;
+      return touches / g;
+    });
+    const epa = weightedNumericFromSeasons(p, (r) => r.passing_epa);
+    if ((primary === "WR" || primary === "TE") && ts != null && ts > 0) wrTeShares.push(ts);
+    if (primary === "RB" && tpg != null && tpg > 0) rbTpg.push(tpg);
+    if (primary === "QB" && epa != null && Number.isFinite(epa)) qbEpa.push(epa);
+  }
+  wrTeShares.sort((x, y) => x - y);
+  rbTpg.sort((x, y) => x - y);
+  qbEpa.sort((x, y) => x - y);
+  return {
+    wrTeTargetShare: quantileAnchors(wrTeShares, 0.05, 0.95),
+    rbTouchesPerGame: quantileAnchors(rbTpg, 0.05, 0.95),
+    qbPassingEpa: quantileAnchors(qbEpa, 0.05, 0.95),
+  };
+}
+
+function richUsageNorm01(profile, primary, richAnchors) {
+  if (!richAnchors) return 0.5;
+  if (primary === "WR" || primary === "TE") {
+    const v = weightedNumericFromSeasons(profile, (r) => r.target_share);
+    if (v == null) return 0.5;
+    return normFromAnchors(v, richAnchors.wrTeTargetShare);
+  }
+  if (primary === "RB") {
+    const v = weightedNumericFromSeasons(profile, (r) => {
+      const g = r.games ?? 0;
+      if (g <= 0) return undefined;
+      const touches =
+        typeof r.touches === "number" && Number.isFinite(r.touches)
+          ? r.touches
+          : typeof r.carries === "number" && typeof r.targets === "number"
+            ? r.carries + r.targets
+            : undefined;
+      if (touches == null || !Number.isFinite(touches)) return undefined;
+      return touches / g;
+    });
+    if (v == null) return 0.5;
+    return normFromAnchors(v, richAnchors.rbTouchesPerGame);
+  }
+  if (primary === "QB") {
+    const v = weightedNumericFromSeasons(profile, (r) => r.passing_epa);
+    if (v == null) return 0.5;
+    return normFromAnchors(v, richAnchors.qbPassingEpa);
+  }
+  return 0.5;
+}
+
+export function productionBaseTradePoints(profile, fp, ppr) {
+  const anchors = fp.anchors;
+  const richAnchors = fp.richAnchors ?? null;
   if (!profile) {
     const combinedNorm01 = stretchCombinedNorm01(0.42);
     return {
@@ -154,7 +249,10 @@ export function productionBaseTradePoints(profile, anchors, ppr) {
   const posNorm = normFromAnchors(wppg, anchors.positionalWppg[primary]);
   const globalNorm = normFromAnchors(weightedPts > 0 ? Math.log1p(Math.max(0, weightedPts)) : 0, anchors.globalLogPts);
   const g = FP_BASE.globalBlend;
-  const blendedRaw = (1 - g) * posNorm + g * globalNorm;
+  const blendedPts = (1 - g) * posNorm + g * globalNorm;
+  const usage01 = richUsageNorm01(profile, primary, richAnchors);
+  const rb = FP_BASE.richStatBlend;
+  const blendedRaw = (1 - rb) * blendedPts + rb * usage01;
   const combinedNorm01 = stretchCombinedNorm01(blendedRaw);
   const basePoints = Math.round(FP_BASE.baseMin + combinedNorm01 * FP_BASE.baseSpan);
   const seasonKeys = presentFpSeasonKeysDesc(profile.seasons);
@@ -162,6 +260,70 @@ export function productionBaseTradePoints(profile, anchors, ppr) {
   const gamesParticipation01 = clamp01(maxG / 17);
   const missing = weightedPts <= 0 && wppg <= 0;
   return { basePoints, combinedNorm01, missing, gamesParticipation01 };
+}
+
+export function flexStartersPerSkill(leagueSize, startFlex) {
+  const pool = leagueSize * startFlex;
+  if (pool <= 0) return { rb: 0, wr: 0, te: 0 };
+  const base = Math.floor(pool / 3);
+  const rem = pool - base * 3;
+  return {
+    rb: base + (rem >= 1 ? 1 : 0),
+    wr: base + (rem >= 2 ? 1 : 0),
+    te: base,
+  };
+}
+
+function listByPosition(profiles, pos, ppr) {
+  return Object.entries(profiles)
+    .filter(([, p]) => p.primaryPosition === pos)
+    .map(([id, p]) => ({ id, proj: weightedSeasonTotals(p, ppr).weightedPts }))
+    .sort((a, b) => b.proj - a.proj);
+}
+
+function baselinePoints(sorted, startersLeagueWide) {
+  if (sorted.length === 0 || startersLeagueWide <= 0) return 0;
+  const idx = Math.min(Math.max(0, startersLeagueWide - 1), sorted.length - 1);
+  return sorted[idx].proj;
+}
+
+export function computeVbdComputation(profiles, ppr, league) {
+  const T = league.leagueSize;
+  const flex = flexStartersPerSkill(T, league.startFlex);
+  const startersQb = T * league.startQb;
+  const startersRb = T * league.startRb + flex.rb;
+  const startersWr = T * league.startWr + flex.wr;
+  const startersTe = T * league.startTe + flex.te;
+  const qbL = listByPosition(profiles, "QB", ppr);
+  const rbL = listByPosition(profiles, "RB", ppr);
+  const wrL = listByPosition(profiles, "WR", ppr);
+  const teL = listByPosition(profiles, "TE", ppr);
+  const bQb = baselinePoints(qbL, startersQb);
+  const bRb = baselinePoints(rbL, startersRb);
+  const bWr = baselinePoints(wrL, startersWr);
+  const bTe = baselinePoints(teL, startersTe);
+  const bySleeperId = {};
+  for (const row of qbL) bySleeperId[row.id] = row.proj - bQb;
+  for (const row of rbL) bySleeperId[row.id] = row.proj - bRb;
+  for (const row of wrL) bySleeperId[row.id] = row.proj - bWr;
+  for (const row of teL) bySleeperId[row.id] = row.proj - bTe;
+  const vals = Object.values(bySleeperId)
+    .filter((n) => Number.isFinite(n))
+    .sort((a, b) => a - b);
+  let scale = null;
+  if (vals.length >= 12) {
+    const lo = vals[Math.max(0, Math.floor(0.1 * (vals.length - 1)))];
+    const hi = vals[Math.min(vals.length - 1, Math.ceil(0.9 * (vals.length - 1)))];
+    if (Number.isFinite(lo) && Number.isFinite(hi) && hi > lo) scale = { lo, hi };
+  }
+  return { bySleeperId, scale };
+}
+
+export function nflDraftRoundTier01(round) {
+  if (round == null || !Number.isFinite(round) || round < 1) return { tier01: NEUTRAL, missing: true };
+  const r = Math.min(7, Math.floor(round));
+  const table = { 1: 0.9, 2: 0.8, 3: 0.68, 4: 0.58, 5: 0.52, 6: 0.48, 7: 0.46 };
+  return { tier01: clamp01(table[r] ?? 0.45), missing: false };
 }
 
 export function tierFromMap(map, key) {
@@ -203,10 +365,19 @@ export function ageCurve01(ageYears, positionLabel) {
     const z = (26.5 - ageYears) / 6;
     return { tier01: clamp01(1 / (1 + Math.exp(-z))), missing: false };
   }
-  const peak = pos === "QB" ? 29 : pos === "RB" ? 24.5 : 26.5;
-  const width = pos === "QB" ? 7 : pos === "RB" ? 4.5 : 6;
+  const peak = pos === "QB" ? 30 : pos === "RB" ? 24 : 26;
+  const width = pos === "QB" ? 6.8 : pos === "RB" ? 3.8 : 5.2;
   const z = (peak - ageYears) / width;
   return { tier01: clamp01(1 / (1 + Math.exp(-z))), missing: false };
+}
+
+export function peakYearsRemaining01(ageYears, positionLabel) {
+  if (ageYears == null || !Number.isFinite(ageYears)) return { years01: 0.5, missing: true };
+  const pos = primarySkillForCurve(positionLabel);
+  const cliff = pos === "QB" ? 34 : pos === "RB" ? 28 : 30;
+  const span = pos === "QB" ? 14 : pos === "RB" ? 10 : 12;
+  const raw = Math.max(0, cliff - ageYears);
+  return { years01: clamp01(Math.min(1, raw / span)), missing: false };
 }
 
 export function futureOutlookRaw(input) {
@@ -270,13 +441,44 @@ export function displayName(raw) {
 export function scorePlayerDetailed(input, providers, league, fp) {
   const components = [];
   const profile = fp.profiles[input.sleeperPlayerId];
-  const prod = productionBaseTradePoints(profile, fp.anchors, league.ppr);
+  const prod = productionBaseTradePoints(profile, fp, league.ppr);
 
   components.push({
     key: "fantasyProduction",
-    label: "Fantasy production (recent seasons, PPR-aware)",
+    label: "Fantasy production (recent seasons, PPR-aware + usage blend)",
     contribution: prod.basePoints,
     missing: prod.missing,
+  });
+
+  const vbdRaw = fp.vbdBySleeperId?.[input.sleeperPlayerId];
+  let vbdMissing = true;
+  let vbdContrib = 0;
+  if (vbdRaw != null && Number.isFinite(vbdRaw)) {
+    if (fp.vbdScale && fp.vbdScale.hi > fp.vbdScale.lo) {
+      vbdMissing = false;
+      const norm = clamp01((vbdRaw - fp.vbdScale.lo) / (fp.vbdScale.hi - fp.vbdScale.lo));
+      const baseAdj = (norm - NEUTRAL) * 2 * MODEL_WEIGHTS.vbdPoints;
+      const pk = peakYearsRemaining01(input.age, input.positionLabel);
+      const dyn = pk.missing ? 1 : 0.35 + 0.65 * pk.years01;
+      vbdContrib = Math.round(baseAdj * dyn);
+    } else {
+      vbdMissing = false;
+      vbdContrib = Math.round(Math.tanh(vbdRaw / 95) * MODEL_WEIGHTS.vbdPoints * 0.85);
+    }
+  }
+  components.push({
+    key: "vbdDynasty",
+    label: "League VBD proxy (retrospective FP vs starter baselines × peak years)",
+    contribution: vbdContrib,
+    missing: vbdMissing,
+  });
+
+  const draftT = nflDraftRoundTier01(input.nflDraftRound ?? null);
+  components.push({
+    key: "draftCapital",
+    label: "NFL draft capital (early rounds)",
+    contribution: (draftT.tier01 - NEUTRAL) * MODEL_WEIGHTS.draftCapitalPoints,
+    missing: draftT.missing,
   });
 
   if (profile && !prod.missing) {

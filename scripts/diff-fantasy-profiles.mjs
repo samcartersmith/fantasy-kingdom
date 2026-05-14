@@ -15,7 +15,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   buildFpAnchors,
+  buildRichStatAnchors,
+  computeVbdComputation,
   createProviders,
+  DEFAULT_STARTING_SLOTS,
   loadRepoJson,
   productionBaseTradePoints,
   resolveAge,
@@ -166,15 +169,31 @@ async function main() {
   const curated = loadRepoJson("src/data/trade-model/curated-snapshot.json");
   const playersMap = await getJson("https://api.sleeper.app/v1/players/nfl");
 
-  const league = { superflex: false, ppr: 1, leagueSize: 12 };
+  const league = { superflex: false, ppr: 1, leagueSize: 12, ...DEFAULT_STARTING_SLOTS };
   const providers = createProviders(curated);
 
   const bProfiles = baselinePayload.profiles ?? {};
   const cProfiles = candidatePayload.profiles ?? {};
   const anchorsB = buildFpAnchors(bProfiles, league.ppr);
   const anchorsC = buildFpAnchors(cProfiles, league.ppr);
-  const fpB = { profiles: bProfiles, anchors: anchorsB };
-  const fpC = { profiles: cProfiles, anchors: anchorsC };
+  const richB = buildRichStatAnchors(bProfiles, league.ppr);
+  const richC = buildRichStatAnchors(cProfiles, league.ppr);
+  const vbdB = computeVbdComputation(bProfiles, league.ppr, league);
+  const vbdC = computeVbdComputation(cProfiles, league.ppr, league);
+  const fpB = {
+    profiles: bProfiles,
+    anchors: anchorsB,
+    richAnchors: richB,
+    vbdBySleeperId: vbdB.bySleeperId,
+    vbdScale: vbdB.scale,
+  };
+  const fpC = {
+    profiles: cProfiles,
+    anchors: anchorsC,
+    richAnchors: richC,
+    vbdBySleeperId: vbdC.bySleeperId,
+    vbdScale: vbdC.scale,
+  };
 
   const ids = [];
   for (const pid of Object.keys(bProfiles)) {
@@ -209,13 +228,14 @@ async function main() {
       trendingAdds: 0,
       age: resolveAge(raw),
       yearsExp: typeof raw.years_exp === "number" ? raw.years_exp : null,
+      nflDraftRound: null,
     };
     const sb = scorePlayerDetailed(input, providers, league, fpB);
     const sc = scorePlayerDetailed(input, providers, league, fpC);
     baseScores.set(pid, sb.value);
     candScores.set(pid, sc.value);
-    const pb = productionBaseTradePoints(bProfiles[pid], anchorsB, league.ppr);
-    const pc = productionBaseTradePoints(cProfiles[pid], anchorsC, league.ppr);
+    const pb = productionBaseTradePoints(bProfiles[pid], fpB, league.ppr);
+    const pc = productionBaseTradePoints(cProfiles[pid], fpC, league.ppr);
     baseMissing.set(pid, pb.missing);
     candMissing.set(pid, pc.missing);
   }

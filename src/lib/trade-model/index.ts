@@ -1,4 +1,4 @@
-export { TRADE_MODEL_VERSION } from "@/lib/trade-model/types";
+export { TRADE_MODEL_VERSION, DEFAULT_STARTING_SLOTS } from "@/lib/trade-model/types";
 export type {
   CatalogEvaluation,
   CuratedTradeSnapshot,
@@ -10,18 +10,21 @@ export type {
   PlayerScoreInput,
   PprMode,
   ScoreResult,
+  StartingSlotCounts,
   TradeModelProviders,
 } from "@/lib/trade-model/types";
 export { createCuratedProviders } from "@/lib/trade-model/providers";
 export { scorePlayer } from "@/lib/trade-model/score-player";
 export { scorePick } from "@/lib/trade-model/score-pick";
-export { resolvePlayerAgeYears, ageCurve01 } from "@/lib/trade-model/age-curve";
+export { resolvePlayerAgeYears, ageCurve01, peakYearsRemaining01 } from "@/lib/trade-model/age-curve";
 export { tryParsePickId } from "@/lib/trade-model/pick-parse";
 export {
   buildFpAnchors,
+  buildRichStatAnchors,
   productionBaseTradePoints,
   weightedPpg,
   weightedSeasonTotals,
+  weightedNumericFromSeasons,
   fpRecencyWeights,
   presentFpSeasonKeysDesc,
   FP_SEASON_ORDER_DESC,
@@ -31,5 +34,8 @@ export type {
   FpAnchors,
   FpScoringContext,
   PlayerFantasyProfile,
+  RichStatAnchors,
 } from "@/lib/trade-model/fp-baseline";
-export { MODEL_WEIGHTS, applyLeagueFormatToPlayerValue, BUZZ_MAX_POINTS, buzzTweakPoints } from "@/lib/trade-model/weights";
+export { computeVbdComputation } from "@/lib/trade-model/vbd";
+export type { VbdComputation } from "@/lib/trade-model/vbd";
+export { MODEL_WEIGHTS, applyLeagueFormatToPlayerValue, BUZZ_MAX_POINTS, buzzTweakPoints, nflDraftRoundTier01 } from "@/lib/trade-model/weights";

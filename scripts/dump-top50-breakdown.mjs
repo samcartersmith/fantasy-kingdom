@@ -17,7 +17,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   buildFpAnchors,
+  buildRichStatAnchors,
+  computeVbdComputation,
   createProviders,
+  DEFAULT_STARTING_SLOTS,
   displayName,
   loadRepoJson,
   productionBaseTradePoints,
@@ -31,6 +34,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const COMPONENT_KEYS = [
   "fantasyProduction",
+  "vbdDynasty",
+  "draftCapital",
   "gamesPlayed",
   "historyCurated",
   "teamOffense",
@@ -46,6 +51,8 @@ const COMPONENT_KEYS = [
 
 const MISSING_KEYS = [
   "missing_fantasyProduction",
+  "missing_vbdDynasty",
+  "missing_draftCapital",
   "missing_historyCurated",
   "missing_teamOffense",
   "missing_oc",
@@ -194,6 +201,8 @@ function contributionMap(components) {
 function missingFlags(components) {
   const keyToCol = {
     fantasyProduction: "missing_fantasyProduction",
+    vbdDynasty: "missing_vbdDynasty",
+    draftCapital: "missing_draftCapital",
     historyCurated: "missing_historyCurated",
     teamOffense: "missing_teamOffense",
     oc: "missing_oc",
@@ -268,7 +277,7 @@ function buildExtendedRowObjects(top, league, fp) {
     const profile = fp.profiles[row.pidStr];
     const wst = profile ? weightedSeasonTotals(profile, league.ppr) : { weightedPts: 0, seasonsUsed: 0 };
     const wpg = profile ? weightedPpg(profile, league.ppr) : { wppg: 0, gamesWeight: 0 };
-    const prod = productionBaseTradePoints(profile, fp.anchors, league.ppr);
+    const prod = productionBaseTradePoints(profile, fp, league.ppr);
 
     rec.input_search_rank = sr === "" ? "" : sr;
     rec.input_trending_adds_72h = ta;
@@ -383,9 +392,19 @@ async function main() {
     }
   }
 
-  const league = { superflex: opts.superflex, ppr: opts.ppr, leagueSize: opts.leagueSize };
+  const draftRounds = loadRepoJson("src/data/trade-model/player-nfl-draft-round.json");
+
+  const league = { ...DEFAULT_STARTING_SLOTS, superflex: opts.superflex, ppr: opts.ppr, leagueSize: opts.leagueSize };
   const anchors = buildFpAnchors(fantasy.profiles, league.ppr);
-  const fp = { profiles: fantasy.profiles, anchors };
+  const richAnchors = buildRichStatAnchors(fantasy.profiles, league.ppr);
+  const vbd = computeVbdComputation(fantasy.profiles, league.ppr, league);
+  const fp = {
+    profiles: fantasy.profiles,
+    anchors,
+    richAnchors,
+    vbdBySleeperId: vbd.bySleeperId,
+    vbdScale: vbd.scale,
+  };
   const providers = createProviders(curated);
 
   const scored = [];
@@ -415,6 +434,8 @@ async function main() {
         trendingAdds: ta,
         age: resolveAge(raw),
         yearsExp: typeof raw.years_exp === "number" && Number.isFinite(raw.years_exp) ? raw.years_exp : null,
+        nflDraftRound:
+          typeof draftRounds[pidStr] === "number" && Number.isFinite(draftRounds[pidStr]) ? draftRounds[pidStr] : null,
       },
       providers,
       league,

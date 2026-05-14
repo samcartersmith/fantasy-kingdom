@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CatalogAsset, CatalogSkillPosition, LineItem } from "@/lib/trade-types";
+import type { StartingSlotCounts } from "@/lib/trade-model/types";
+import { DEFAULT_STARTING_SLOTS } from "@/lib/trade-model/types";
 import {
   SUPERFLEX_QB_MULTIPLIER,
   catalogPlayerHasSkillPosition,
@@ -49,14 +51,52 @@ const selectFieldClass =
 const btnPress =
   "cursor-pointer motion-safe:transition motion-safe:duration-150 motion-safe:active:scale-[0.97]";
 
+function StarterSlotRow({
+  id,
+  label,
+  value,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  value: StartingSlotCounts["startQb"];
+  onChange: (v: StartingSlotCounts["startQb"]) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4 py-2">
+      <label htmlFor={id} className="text-sm font-medium text-dash-text/85">
+        {label}
+      </label>
+      <select
+        id={id}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value) as StartingSlotCounts["startQb"])}
+        className={`${selectFieldClass} min-w-[4.5rem]`}
+      >
+        {START_SLOT_OPTIONS.map((n) => (
+          <option key={n} value={n}>
+            {n}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 const CATALOG_TABS = ["Picks", "QB", "RB", "WR", "TE"] as const;
 type CatalogTab = (typeof CATALOG_TABS)[number];
+
+const START_SLOT_OPTIONS = [1, 2, 3, 4] as const;
 
 export function TradeCalculator() {
   const nextLineId = useLineId();
   const [superflex, setSuperflex] = useState(false);
   const [leagueSize, setLeagueSize] = useState<8 | 10 | 12 | 14>(12);
   const [ppr, setPpr] = useState<1 | 0.5 | 0>(1);
+  const [starters, setStarters] = useState<StartingSlotCounts>(() => ({ ...DEFAULT_STARTING_SLOTS }));
+  const [rosterModalOpen, setRosterModalOpen] = useState(false);
+  const [startersDraft, setStartersDraft] = useState<StartingSlotCounts>(() => ({ ...DEFAULT_STARTING_SLOTS }));
+  const rosterDialogRef = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState("");
   const [catalogTab, setCatalogTab] = useState<CatalogTab>("Picks");
   const [team1, setTeam1] = useState<LineItem[]>([]);
@@ -71,6 +111,28 @@ export function TradeCalculator() {
   const leagueFormatApplied = catalogMeta?.leagueFormatApplied === true;
 
   useEffect(() => {
+    if (!rosterModalOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setRosterModalOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [rosterModalOpen]);
+
+  useEffect(() => {
+    if (!rosterModalOpen) return;
+    const id = window.requestAnimationFrame(() => {
+      const root = rosterDialogRef.current;
+      if (!root) return;
+      const focusable = root.querySelector<HTMLElement>(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      );
+      focusable?.focus();
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [rosterModalOpen]);
+
+  useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoadError(null);
@@ -79,6 +141,11 @@ export function TradeCalculator() {
         params.set("superflex", superflex ? "1" : "0");
         params.set("ppr", String(ppr));
         params.set("league_size", String(leagueSize));
+        params.set("start_qb", String(starters.startQb));
+        params.set("start_rb", String(starters.startRb));
+        params.set("start_wr", String(starters.startWr));
+        params.set("start_te", String(starters.startTe));
+        params.set("start_flex", String(starters.startFlex));
         const res = await fetch(`/api/trade-catalog?${params.toString()}`, { cache: "no-store" });
         const body = (await res.json()) as TradeCatalogResponse & { error?: string };
         if (!res.ok) {
@@ -102,7 +169,7 @@ export function TradeCalculator() {
     return () => {
       cancelled = true;
     };
-  }, [superflex, ppr, leagueSize]);
+  }, [superflex, ppr, leagueSize, starters]);
 
   const effOpts = useMemo(
     () => ({ superflex, leagueFormatApplied }),
@@ -166,6 +233,20 @@ export function TradeCalculator() {
     setTeam2([]);
   }, []);
 
+  const openRosterModal = useCallback(() => {
+    setStartersDraft({ ...starters });
+    setRosterModalOpen(true);
+  }, [starters]);
+
+  const applyRosterDraft = useCallback(() => {
+    setStarters({ ...startersDraft });
+    setRosterModalOpen(false);
+  }, [startersDraft]);
+
+  const cancelRosterModal = useCallback(() => {
+    setRosterModalOpen(false);
+  }, []);
+
   const resolveLines = useCallback(
     (lines: LineItem[]) =>
       lines
@@ -179,6 +260,11 @@ export function TradeCalculator() {
 
   const t1Resolved = resolveLines(team1);
   const t2Resolved = resolveLines(team2);
+
+  const assignedAssetIds = useMemo(
+    () => new Set<string>([...team1.map((l) => l.assetId), ...team2.map((l) => l.assetId)]),
+    [team1, team2],
+  );
 
   const sum = useCallback(
     (lines: { asset: CatalogAsset }[]) =>
@@ -285,6 +371,13 @@ export function TradeCalculator() {
                 </span>
               ) : null}
             </div>
+            <button
+              type="button"
+              onClick={openRosterModal}
+              className={`${btnPress} min-h-11 text-sm font-medium px-3 rounded-[var(--dash-radius-sm)] border border-white/15 text-dash-text hover:bg-white/5 transition-colors shrink-0 self-start sm:self-center`}
+            >
+              Roster
+            </button>
           </div>
           <button
             type="button"
@@ -304,6 +397,7 @@ export function TradeCalculator() {
           lines={t1Resolved}
           superflex={superflex}
           leagueFormatApplied={leagueFormatApplied}
+          excludeAssetIds={assignedAssetIds}
           flashTick={flashTicks[1]}
           onAddAsset={(asset: CatalogAsset) => addTo(1, asset.id, asset.name)}
           onRemove={(lineId) => removeFrom(1, lineId)}
@@ -315,6 +409,7 @@ export function TradeCalculator() {
           lines={t2Resolved}
           superflex={superflex}
           leagueFormatApplied={leagueFormatApplied}
+          excludeAssetIds={assignedAssetIds}
           flashTick={flashTicks[2]}
           onAddAsset={(asset: CatalogAsset) => addTo(2, asset.id, asset.name)}
           onRemove={(lineId) => removeFrom(2, lineId)}
@@ -433,6 +528,78 @@ export function TradeCalculator() {
           <p className="text-xs text-dash-text/55">Nothing in this tab.</p>
         ) : null}
       </section>
+
+      {rosterModalOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/55"
+          role="presentation"
+          onClick={cancelRosterModal}
+        >
+          <div
+            ref={rosterDialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="trade-roster-title"
+            className="max-w-md w-full bg-dash-surface-elevated p-5 sm:p-6 rounded-[var(--dash-radius-md)] border border-white/15 shadow-xl ring-1 ring-white/10"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 id="trade-roster-title" className="text-base font-semibold text-dash-text mb-1">
+              Starting lineup (per team)
+            </h2>
+            <p className="text-xs text-dash-text/60 mb-4">
+              Counts are sent to the trade catalog API for VBD-style scarcity. Each slot is 1–4 starters.
+            </p>
+            <div className="divide-y divide-white/10 border-y border-white/10 mb-5">
+              <StarterSlotRow
+                id="trade-start-qb"
+                label="QB"
+                value={startersDraft.startQb}
+                onChange={(v) => setStartersDraft((s) => ({ ...s, startQb: v }))}
+              />
+              <StarterSlotRow
+                id="trade-start-rb"
+                label="RB"
+                value={startersDraft.startRb}
+                onChange={(v) => setStartersDraft((s) => ({ ...s, startRb: v }))}
+              />
+              <StarterSlotRow
+                id="trade-start-wr"
+                label="WR"
+                value={startersDraft.startWr}
+                onChange={(v) => setStartersDraft((s) => ({ ...s, startWr: v }))}
+              />
+              <StarterSlotRow
+                id="trade-start-te"
+                label="TE"
+                value={startersDraft.startTe}
+                onChange={(v) => setStartersDraft((s) => ({ ...s, startTe: v }))}
+              />
+              <StarterSlotRow
+                id="trade-start-flex"
+                label="FLEX (RB/WR/TE)"
+                value={startersDraft.startFlex}
+                onChange={(v) => setStartersDraft((s) => ({ ...s, startFlex: v }))}
+              />
+            </div>
+            <div className="flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={cancelRosterModal}
+                className={`${btnPress} min-h-11 text-sm font-medium px-4 rounded-[var(--dash-radius-sm)] border border-white/15 text-dash-text hover:bg-white/5 transition-colors`}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={applyRosterDraft}
+                className={`${btnPress} min-h-11 text-sm font-semibold px-4 rounded-[var(--dash-radius-sm)] bg-dash-primary text-dash-text hover:bg-dash-primary/90 transition-colors`}
+              >
+                Apply
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

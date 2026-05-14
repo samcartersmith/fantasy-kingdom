@@ -11,6 +11,7 @@
     "data:fantasy": "node scripts/build-fantasy-profiles-nflverse.mjs",
     "data:fantasy:sleeper": "node scripts/build-fantasy-profiles.mjs",
     "data:fantasy:nflverse": "node scripts/build-fantasy-profiles-nflverse.mjs",
+    "data:draft-rounds": "node scripts/build-player-draft-rounds.mjs",
     "data:fantasy:spike-join": "node scripts/nflverse-join-coverage-spike.mjs",
     "data:fantasy:diff": "node scripts/diff-fantasy-profiles.mjs",
     "data:top50-breakdown": "node scripts/dump-top50-breakdown.mjs",
