@@ -11,7 +11,8 @@ import { fetchSleeperNflPlayersMap, fetchSleeperTrendingAdds } from "@/lib/sleep
 import { SLEEPER_NFL_PLAYERS_URL, SLEEPER_PLAYERS_REVALIDATE_SECONDS } from "@/lib/sleeper-constants";
 import { sleeperPlayersMapToCatalog, sleeperPlayersMapToCatalogModeled } from "@/lib/sleeper-map";
 
-export const revalidate = SLEEPER_PLAYERS_REVALIDATE_SECONDS;
+/** Keep in sync with `SLEEPER_PLAYERS_REVALIDATE_SECONDS` in `sleeper-constants.ts`. */
+export const revalidate = 86_400;
 
 const curatedSnapshot = curatedSnapshotJson as CuratedTradeSnapshot;
 const fantasyProfilePayload = fantasyProfileJson as FantasyProfilePayload;

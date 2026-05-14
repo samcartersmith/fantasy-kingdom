@@ -3,6 +3,7 @@ import {
   buildFpAnchors,
   productionBaseTradePoints,
   stretchCombinedNorm01,
+  weightedSeasonTotals,
   type PlayerFantasyProfile,
 } from "@/lib/trade-model/fp-baseline";
 import { scorePlayer } from "@/lib/trade-model/score-player";
@@ -37,8 +38,8 @@ function seedWrProfiles(): Record<string, PlayerFantasyProfile> {
     out[`seed_wr_${i}`] = {
       primaryPosition: "WR",
       seasons: {
-        "2024": wrSeason(p),
-        "2023": wrSeason(Math.max(25, p - 30)),
+        "2025": wrSeason(p),
+        "2024": wrSeason(Math.max(25, p - 30)),
       },
     };
   });
@@ -68,7 +69,7 @@ describe("scorePlayer", () => {
     const fp = mkFp({
       "999": {
         primaryPosition: "WR",
-        seasons: { "2024": wrSeason(160), "2023": wrSeason(140) },
+        seasons: { "2025": wrSeason(160), "2024": wrSeason(140) },
       },
     });
     const low = scorePlayer({ ...fixedPlayer, teamAbbr: "ZZ1" }, neutralProviders(0.35, false), neutralLeague, fp);
@@ -80,7 +81,7 @@ describe("scorePlayer", () => {
     const fp = mkFp({
       "999": {
         primaryPosition: "WR",
-        seasons: { "2024": wrSeason(160), "2023": wrSeason(140) },
+        seasons: { "2025": wrSeason(160), "2024": wrSeason(140) },
       },
     });
     const missing = scorePlayer({ ...fixedPlayer, teamAbbr: "XXX" }, neutralProviders(0.5, true), neutralLeague, fp);
@@ -92,11 +93,11 @@ describe("scorePlayer", () => {
     const fp = mkFp({
       star: {
         primaryPosition: "WR",
-        seasons: { "2024": wrSeason(380), "2023": wrSeason(300) },
+        seasons: { "2025": wrSeason(380), "2024": wrSeason(300) },
       },
       scrub: {
         primaryPosition: "WR",
-        seasons: { "2024": wrSeason(48), "2023": wrSeason(40) },
+        seasons: { "2025": wrSeason(48), "2024": wrSeason(40) },
       },
     });
     const buzz = { searchRank: 400, trendingAdds: 10, age: 24, yearsExp: 2 };
@@ -122,6 +123,32 @@ describe("scorePlayer", () => {
   });
 });
 
+describe("weightedSeasonTotals recency", () => {
+  it("uses 65/35 for two seasons (newest heaviest)", () => {
+    const profile: PlayerFantasyProfile = {
+      primaryPosition: "WR",
+      seasons: { "2025": wrSeason(100), "2024": wrSeason(80) },
+    };
+    expect(weightedSeasonTotals(profile, 1).weightedPts).toBeCloseTo(0.65 * 100 + 0.35 * 80);
+  });
+
+  it("uses 50/35/15 when 2023–2025 are all present", () => {
+    const profile: PlayerFantasyProfile = {
+      primaryPosition: "WR",
+      seasons: { "2025": wrSeason(100), "2024": wrSeason(80), "2023": wrSeason(60) },
+    };
+    expect(weightedSeasonTotals(profile, 1).weightedPts).toBeCloseTo(0.5 * 100 + 0.35 * 80 + 0.15 * 60);
+  });
+
+  it("treats negative nflverse-style season totals as zero for weighting", () => {
+    const profile: PlayerFantasyProfile = {
+      primaryPosition: "WR",
+      seasons: { "2025": { pts_ppr: -3, pts_half_ppr: -2, pts_std: -1, games: 8 } },
+    };
+    expect(weightedSeasonTotals(profile, 1).weightedPts).toBe(0);
+  });
+});
+
 describe("stretchCombinedNorm01", () => {
   it("expands separation in the elite band vs identity mapping", () => {
     const a = stretchCombinedNorm01(0.86);
@@ -131,21 +158,35 @@ describe("stretchCombinedNorm01", () => {
 });
 
 describe("productionBaseTradePoints elite tail", () => {
+  it("does not produce NaN when a season row has negative points (clamped to 0)", () => {
+    const profiles: Record<string, PlayerFantasyProfile> = {
+      ...seedWrProfiles(),
+      neg: {
+        primaryPosition: "WR",
+        seasons: { "2025": { pts_ppr: -2, pts_half_ppr: -1, pts_std: 0, games: 4 } },
+      },
+    };
+    const anchors = buildFpAnchors(profiles, 1);
+    const r = productionBaseTradePoints(profiles.neg, "WR", 1, anchors);
+    expect(Number.isFinite(r.basePoints)).toBe(true);
+    expect(Number.isFinite(r.combinedNorm01)).toBe(true);
+  });
+
   it("assigns meaningfully wider basePoints between two high-end WR profiles than raw norm delta alone", () => {
     const profiles: Record<string, PlayerFantasyProfile> = {
       ...Object.fromEntries(
         [40, 55, 70, 85, 100, 115, 130, 145].map((p, i) => [
           `fill_${i}`,
-          { primaryPosition: "WR" as const, seasons: { "2024": wrSeason(p), "2023": wrSeason(Math.max(30, p - 20)) } },
+          { primaryPosition: "WR" as const, seasons: { "2025": wrSeason(p), "2024": wrSeason(Math.max(30, p - 20)) } },
         ]),
       ),
       eliteA: {
         primaryPosition: "WR",
-        seasons: { "2024": wrSeason(300), "2023": wrSeason(260) },
+        seasons: { "2025": wrSeason(300), "2024": wrSeason(260) },
       },
       eliteB: {
         primaryPosition: "WR",
-        seasons: { "2024": wrSeason(390), "2023": wrSeason(340) },
+        seasons: { "2025": wrSeason(390), "2024": wrSeason(340) },
       },
     };
     const anchors = buildFpAnchors(profiles, 1);

@@ -6,7 +6,7 @@ import type { TradeModelProviders } from "@/lib/trade-model/types";
 
 /** Local draft pick rows (Sleeper does not ship dynasty pick “players” in `players/nfl`). */
 export function getLocalPickAssets(): CatalogAsset[] {
-  return picksData.assets.filter((a): a is CatalogAsset => a.kind === "pick");
+  return picksData.assets.filter((a) => a.kind === "pick") as CatalogAsset[];
 }
 
 /** Re-score picks using the fair-trade pick model (anchor + class strength + time discount). */

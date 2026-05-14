@@ -45,35 +45,65 @@ export function clampValue(n) {
 }
 
 export function pickPts(row, ppr) {
-  if (ppr >= 1) return row.pts_ppr;
-  if (ppr >= 0.5) return row.pts_half_ppr;
-  return row.pts_std;
+  let raw;
+  if (ppr >= 1) raw = row.pts_ppr;
+  else if (ppr >= 0.5) raw = row.pts_half_ppr;
+  else raw = row.pts_std;
+  if (!Number.isFinite(raw)) return 0;
+  return Math.max(0, raw);
+}
+
+const FP_SEASON_ORDER_DESC = ["2025", "2024", "2023"];
+
+function presentFpSeasonKeysDesc(seasons) {
+  const out = [];
+  for (const y of FP_SEASON_ORDER_DESC) {
+    if (seasons[y]) out.push(y);
+  }
+  return out;
+}
+
+function fpRecencyWeights(count) {
+  if (count === 1) return [1];
+  if (count === 2) return [0.65, 0.35];
+  if (count === 3) return [0.5, 0.35, 0.15];
+  throw new Error(`fpRecencyWeights: unsupported season count ${count}`);
 }
 
 export function weightedSeasonTotals(profile, ppr) {
-  const s24 = profile.seasons["2024"];
-  const s23 = profile.seasons["2023"];
-  const p24 = s24 ? pickPts(s24, ppr) : null;
-  const p23 = s23 ? pickPts(s23, ppr) : null;
-  if (p24 != null && p23 != null) return { weightedPts: 0.65 * p24 + 0.35 * p23, seasonsUsed: 2 };
-  if (p24 != null) return { weightedPts: p24, seasonsUsed: 1 };
-  if (p23 != null) return { weightedPts: p23, seasonsUsed: 1 };
-  return { weightedPts: 0, seasonsUsed: 0 };
+  const keys = presentFpSeasonKeysDesc(profile.seasons);
+  if (keys.length === 0) return { weightedPts: 0, seasonsUsed: 0 };
+  const w = fpRecencyWeights(keys.length);
+  let weightedPts = 0;
+  for (let i = 0; i < keys.length; i++) {
+    const row = profile.seasons[keys[i]];
+    weightedPts += w[i] * pickPts(row, ppr);
+  }
+  return { weightedPts, seasonsUsed: keys.length };
 }
 
 export function weightedPpg(profile, ppr) {
-  const s24 = profile.seasons["2024"];
-  const s23 = profile.seasons["2023"];
-  const p24 = s24 ? pickPts(s24, ppr) : null;
-  const g24 = s24?.games ?? 0;
-  const p23 = s23 ? pickPts(s23, ppr) : null;
-  const g23 = s23?.games ?? 0;
-  if (p24 != null && p23 != null && g24 > 0 && g23 > 0) {
-    return { wppg: 0.65 * (p24 / g24) + 0.35 * (p23 / g23), gamesWeight: 0.65 * g24 + 0.35 * g23 };
+  const keys = presentFpSeasonKeysDesc(profile.seasons);
+  const usable = keys.filter((y) => {
+    const r = profile.seasons[y];
+    if (!r) return false;
+    const p = pickPts(r, ppr);
+    const g = r.games ?? 0;
+    return Number.isFinite(p) && g > 0;
+  });
+  if (usable.length === 0) return { wppg: 0, gamesWeight: 0 };
+  const w = fpRecencyWeights(usable.length);
+  let wppgAcc = 0;
+  let gamesWeight = 0;
+  for (let i = 0; i < usable.length; i++) {
+    const y = usable[i];
+    const r = profile.seasons[y];
+    const p = pickPts(r, ppr);
+    const g = r.games ?? 0;
+    wppgAcc += w[i] * (p / g);
+    gamesWeight += w[i] * g;
   }
-  if (p24 != null && g24 > 0) return { wppg: p24 / g24, gamesWeight: g24 };
-  if (p23 != null && g23 > 0) return { wppg: p23 / g23, gamesWeight: g23 };
-  return { wppg: 0, gamesWeight: 0 };
+  return { wppg: wppgAcc, gamesWeight };
 }
 
 export function quantileAnchors(sorted, qLo, qHi) {
@@ -96,7 +126,7 @@ export function buildFpAnchors(profiles, ppr) {
   for (const p of Object.values(profiles)) {
     const { wppg } = weightedPpg(p, ppr);
     const { weightedPts } = weightedSeasonTotals(p, ppr);
-    if (weightedPts > 0) globals.push(Math.log1p(weightedPts));
+    if (weightedPts > 0) globals.push(Math.log1p(Math.max(0, weightedPts)));
     if (wppg > 0 && p.primaryPosition) byPos[p.primaryPosition].push(wppg);
   }
   const positionalWppg = {};
@@ -122,16 +152,13 @@ export function productionBaseTradePoints(profile, anchors, ppr) {
   const { wppg, gamesWeight } = weightedPpg(profile, ppr);
   const { weightedPts } = weightedSeasonTotals(profile, ppr);
   const posNorm = normFromAnchors(wppg, anchors.positionalWppg[primary]);
-  const globalNorm = normFromAnchors(weightedPts > 0 ? Math.log1p(weightedPts) : 0, anchors.globalLogPts);
+  const globalNorm = normFromAnchors(weightedPts > 0 ? Math.log1p(Math.max(0, weightedPts)) : 0, anchors.globalLogPts);
   const g = FP_BASE.globalBlend;
   const blendedRaw = (1 - g) * posNorm + g * globalNorm;
   const combinedNorm01 = stretchCombinedNorm01(blendedRaw);
   const basePoints = Math.round(FP_BASE.baseMin + combinedNorm01 * FP_BASE.baseSpan);
-  const maxG = Math.max(
-    profile.seasons["2024"]?.games ?? 0,
-    profile.seasons["2023"]?.games ?? 0,
-    gamesWeight,
-  );
+  const seasonKeys = presentFpSeasonKeysDesc(profile.seasons);
+  const maxG = Math.max(0, ...seasonKeys.map((y) => profile.seasons[y]?.games ?? 0), gamesWeight);
   const gamesParticipation01 = clamp01(maxG / 17);
   const missing = weightedPts <= 0 && wppg <= 0;
   return { basePoints, combinedNorm01, missing, gamesParticipation01 };

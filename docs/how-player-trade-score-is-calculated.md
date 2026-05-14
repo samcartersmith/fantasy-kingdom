@@ -16,9 +16,9 @@ Each player gets a single **trade point total** after the steps below. The UI ma
 
 This is the **largest** part of the score.
 
-- **Data**: A checked-in snapshot built from Sleeper’s **regular-season stat rollups** (recent NFL seasons) plus each player’s **primary skill position** (QB, RB, WR, TE) from Sleeper’s player map. Refresh the snapshot by running `npm run data:fantasy` (see `scripts/build-fantasy-profiles.mjs`).
+- **Data**: A checked-in snapshot from **nflverse** regular-season player CSVs (recent NFL seasons) for fantasy points + games, joined to each player’s **Sleeper id** and **primary skill position** (QB, RB, WR, TE) via Sleeper’s `gsis_id`. Refresh by running **`npm run data:fantasy`** ([`scripts/build-fantasy-profiles-nflverse.mjs`](../scripts/build-fantasy-profiles-nflverse.mjs)). An optional Sleeper-only rollup for diff lives in `player-fantasy-profile.sleeper.json` (`npm run data:fantasy:sleeper`); see [`docs/nflverse-scoring-parity.md`](nflverse-scoring-parity.md).
 - **Scoring mode**: The catalog request tells the server whether your league is **full PPR**, **half PPR**, or **non-PPR**. The model uses the matching points column for each season row.
-- **Recency blend**: Recent season totals are weighted a bit more than the prior season so the score reacts to the latest year of football, without ignoring the previous year entirely.
+- **Recency blend**: Up to the **three most recent** seasons present on the profile (`2025`, `2024`, `2023`, newest first) are combined with fixed recency weights: **50% / 35% / 15%** when all three exist, otherwise **65% / 35%** for two seasons, or 100% for a single season—so the score reacts most to the latest year of football while still using older seasons when present.
 - **Two normalizations blended together**:
   1. **Within your position**: your weighted per-game pace is compared to other players **at the same position** in the snapshot (roughly “how elite is this season line for a WR vs other WRs?”). Anchor percentiles use the **~5th–~95th** sample band (wider than a tight p10–p90 window) so elite starters are less compressed.
   2. **Across all skill positions**: the same player’s **weighted season point total** (log-scaled) is compared to everyone in the snapshot so an elite season at any skill spot earns a fair global bump.
@@ -83,6 +83,8 @@ A modest adjustment for **PPR vs non-PPR** (mostly affecting pass catchers) and 
 
 **Search rank** (how often players are looked up in Sleeper) and **recent add counts** (trending) are combined into a **sentiment nudge** with a **strict cap** so buzz cannot dominate the score anymore.
 
+**Design note (rookies / thin résumé):** boards like FantasyCalc still price rookies off **draft capital and projection** while this model uses a **neutral production prior** when stat rows are missing. A future improvement is a **separate, capped channel** (for example **Sleeper ADP aggregated from public drafts**, or a **longer trending window** than the trade cap uses) applied only when **games played in the FP snapshot is very low**, so market context moves the needle without reopening uncapped hype. URL helpers for extra endpoints live in `src/lib/sleeper-supplemental.ts`.
+
 ---
 
 ## 12. Step 11 — Superflex (QBs only)
@@ -107,3 +109,26 @@ Draft picks **do not** use the player fantasy snapshot. They start from **local 
 ## 15. Legacy mode
 
 Calling the trade catalog API with `?legacy=1` restores the older **Sleeper buzz–only** player heuristic for comparison. It does **not** use the fantasy production snapshot.
+
+---
+
+## 16. Reproducible stats (nflverse) vs Sleeper platform signals
+
+- **Historical fantasy production in the trade spine** is **nflverse-backed** and checked in as `player-fantasy-profile.json` after `npm run data:fantasy` (see `docs/nflverse-scoring-parity.md`).
+- **Sleeper as a live platform** (not a stats warehouse) is the right place for signals that nflverse does not own:
+  - **Market sentiment** — trending adds/drops over short windows (already used in a capped way for trade buzz).
+  - **Fantasy ADP** — mock and live draft prices on Sleeper (not NFL draft slot); useful for priors or calibration, typically cached daily—not per keystroke.
+  - **League state** — rosters, trades, waivers when you bind a league id; not needed for the global trade index today.
+  - **Projections** — Sleeper’s forward-looking points; relevant for start/sit or projection-first dynasty layers, not the current v2 retrospective spine.
+
+Request-time reads use caching; URL helpers live in `src/lib/sleeper-supplemental.ts`.
+
+---
+
+## 17. Calibration vs external boards
+
+To compare ranks to a **FantasyCalc-style** export (semicolon-separated, `sleeperId` + `value`), run:
+
+`node scripts/calibrate-vs-reference.mjs --reference /path/to/fantasycalc_dynasty_rankings.csv`
+
+The script prints **Spearman** correlation, **linear regression** of reference value on model score, and a **monotone (isotonic) fit** summary along model sort order. The default checked-in CSV still uses the legacy comma format with player names.
