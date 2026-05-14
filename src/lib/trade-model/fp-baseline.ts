@@ -6,6 +6,22 @@ export type SeasonFpRow = {
   pts_half_ppr: number;
   pts_std: number;
   games: number;
+  /** nflverse `stats_player` season fields when present (built by `npm run data:fantasy`). */
+  targets?: number;
+  /** 0–1 team target share (WR/TE). */
+  target_share?: number;
+  carries?: number;
+  receptions?: number;
+  /** RB-style opportunity: carries + targets. */
+  touches?: number;
+  /** Season passing EPA (QB). */
+  passing_epa?: number;
+  passing_yards?: number;
+  attempts?: number;
+  /** Yards per attempt when attempts > 0. */
+  passing_ypa?: number;
+  /** Red-zone / short-yardage receiving targets when sourced from pbp builds; else omitted. */
+  rz_targets?: number;
 };
 
 export type PlayerFantasyProfile = {
@@ -31,10 +47,26 @@ export type FpAnchors = {
   globalLogPts: FpQuantileBand | null;
 };
 
+/** Anchors for optional “rich stat” normalization (same p5–p95 style as production). */
+export type RichStatAnchors = {
+  wrTeTargetShare: FpQuantileBand | null;
+  rbTouchesPerGame: FpQuantileBand | null;
+  qbPassingEpa: FpQuantileBand | null;
+};
+
 export type FpScoringContext = {
   snapshotAsOf: string;
   profiles: Record<string, PlayerFantasyProfile>;
   anchors: FpAnchors;
+  /** Percentile anchors for usage / efficiency blend; null if insufficient sample. */
+  richAnchors: RichStatAnchors | null;
+  /**
+   * Retrospective VBD proxy: weighted fantasy points minus worst-starter baseline for this league’s
+   * starting counts (see `computeVbdComputation`). Empty when not computed.
+   */
+  vbdBySleeperId: Record<string, number>;
+  /** p10/p90 style band for mapping raw VBD to a capped trade-point nudge. */
+  vbdScale: { lo: number; hi: number } | null;
 };
 
 const SKILL_ORDER: SkillPosition[] = ["QB", "RB", "WR", "TE"];
@@ -112,6 +144,106 @@ export function weightedPpg(profile: PlayerFantasyProfile, ppr: PprMode): {
   return { wppg: wppgAcc, gamesWeight };
 }
 
+/**
+ * Recency-weighted scalar from per-season rows (skips seasons where `picker` returns undefined).
+ */
+export function weightedNumericFromSeasons(
+  profile: PlayerFantasyProfile,
+  picker: (row: SeasonFpRow) => number | undefined | null,
+): number | null {
+  const keys = presentFpSeasonKeysDesc(profile.seasons);
+  if (keys.length === 0) return null;
+  const w = fpRecencyWeights(keys.length);
+  let acc = 0;
+  let sumW = 0;
+  for (let i = 0; i < keys.length; i++) {
+    const row = profile.seasons[keys[i]!]!;
+    const v = picker(row);
+    if (typeof v === "number" && Number.isFinite(v)) {
+      acc += w[i]! * v;
+      sumW += w[i]!;
+    }
+  }
+  if (sumW <= 0) return null;
+  return acc / sumW;
+}
+
+/**
+ * Builds percentile anchors for optional nflverse “rich” fields (target share, RB touches/game, QB EPA).
+ */
+export function buildRichStatAnchors(profiles: Record<string, PlayerFantasyProfile>, _ppr: PprMode): RichStatAnchors {
+  const wrTeShares: number[] = [];
+  const rbTpg: number[] = [];
+  const qbEpa: number[] = [];
+
+  for (const p of Object.values(profiles)) {
+    const primary = p.primaryPosition;
+    const ts = weightedNumericFromSeasons(p, (r) => r.target_share);
+    const tpg = weightedNumericFromSeasons(p, (r) => {
+      const g = r.games ?? 0;
+      if (g <= 0) return undefined;
+      const touches =
+        typeof r.touches === "number" && Number.isFinite(r.touches)
+          ? r.touches
+          : typeof r.carries === "number" && typeof r.targets === "number"
+            ? r.carries + r.targets
+            : undefined;
+      if (touches == null || !Number.isFinite(touches)) return undefined;
+      return touches / g;
+    });
+    const epa = weightedNumericFromSeasons(p, (r) => r.passing_epa);
+
+    if ((primary === "WR" || primary === "TE") && ts != null && ts > 0) wrTeShares.push(ts);
+    if (primary === "RB" && tpg != null && tpg > 0) rbTpg.push(tpg);
+    if (primary === "QB" && epa != null && Number.isFinite(epa)) qbEpa.push(epa);
+  }
+
+  wrTeShares.sort((x, y) => x - y);
+  rbTpg.sort((x, y) => x - y);
+  qbEpa.sort((x, y) => x - y);
+
+  return {
+    wrTeTargetShare: quantileAnchors(wrTeShares, 0.05, 0.95),
+    rbTouchesPerGame: quantileAnchors(rbTpg, 0.05, 0.95),
+    qbPassingEpa: quantileAnchors(qbEpa, 0.05, 0.95),
+  };
+}
+
+function richUsageNorm01(
+  profile: PlayerFantasyProfile,
+  primary: SkillPosition,
+  richAnchors: RichStatAnchors | null,
+): number {
+  if (!richAnchors) return 0.5;
+  if (primary === "WR" || primary === "TE") {
+    const v = weightedNumericFromSeasons(profile, (r) => r.target_share);
+    if (v == null) return 0.5;
+    return normFromAnchors(v, richAnchors.wrTeTargetShare);
+  }
+  if (primary === "RB") {
+    const v = weightedNumericFromSeasons(profile, (r) => {
+      const g = r.games ?? 0;
+      if (g <= 0) return undefined;
+      const touches =
+        typeof r.touches === "number" && Number.isFinite(r.touches)
+          ? r.touches
+          : typeof r.carries === "number" && typeof r.targets === "number"
+            ? r.carries + r.targets
+            : undefined;
+      if (touches == null || !Number.isFinite(touches)) return undefined;
+      return touches / g;
+    });
+    if (v == null) return 0.5;
+    return normFromAnchors(v, richAnchors.rbTouchesPerGame);
+  }
+  if (primary === "QB") {
+    const v = weightedNumericFromSeasons(profile, (r) => r.passing_epa);
+    if (v == null) return 0.5;
+    return normFromAnchors(v, richAnchors.qbPassingEpa);
+  }
+  return 0.5;
+}
+
 /** ~5th / ~95th sample positions (wider than p10–p90) so elite starters separate more in normalized space. */
 function quantileAnchors(sorted: number[], qLo: number, qHi: number): FpQuantileBand | null {
   const n = sorted.length;
@@ -175,12 +307,15 @@ export type FpBaselineConstants = {
   baseSpan: number;
   /** Blend: positional PPG norm vs global season-points norm (higher = more cross-position separation). */
   globalBlend: number;
+  /** How much rich usage / efficiency norms pull the blended 0–1 strength (rest stays on fantasy points blend). */
+  richStatBlend: number;
 };
 
 export const FP_BASELINE_DEFAULTS: FpBaselineConstants = {
   baseMin: 1400,
   baseSpan: 11_200,
   globalBlend: 0.45,
+  richStatBlend: 0.09,
 };
 
 /**
@@ -202,9 +337,11 @@ export function productionBaseTradePoints(
   profile: PlayerFantasyProfile | undefined,
   positionLabel: string,
   ppr: PprMode,
-  anchors: FpAnchors,
+  fp: FpScoringContext,
   constants: FpBaselineConstants = FP_BASELINE_DEFAULTS,
 ): ProductionBaseResult {
+  const anchors = fp.anchors;
+
   if (!profile) {
     const combinedNorm01 = stretchCombinedNorm01(0.42);
     return {
@@ -226,7 +363,10 @@ export function productionBaseTradePoints(
   const globalNorm = normFromAnchors(logPts, anchors.globalLogPts);
 
   const g = constants.globalBlend;
-  const blendedRaw = (1 - g) * posNorm + g * globalNorm;
+  const blendedPts = (1 - g) * posNorm + g * globalNorm;
+  const usage01 = richUsageNorm01(profile, primary, fp.richAnchors);
+  const rb = constants.richStatBlend;
+  const blendedRaw = (1 - rb) * blendedPts + rb * usage01;
   const combinedNorm01 = stretchCombinedNorm01(blendedRaw);
 
   const basePoints = Math.round(constants.baseMin + combinedNorm01 * constants.baseSpan);

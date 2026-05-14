@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildFpAnchors,
+  buildRichStatAnchors,
   productionBaseTradePoints,
   stretchCombinedNorm01,
   weightedSeasonTotals,
@@ -9,9 +10,16 @@ import {
 import { scorePlayer } from "@/lib/trade-model/score-player";
 import { scorePick } from "@/lib/trade-model/score-pick";
 import type { LeagueContext, TradeModelProviders } from "@/lib/trade-model/types";
+import { DEFAULT_STARTING_SLOTS } from "@/lib/trade-model/types";
+import { computeVbdComputation } from "@/lib/trade-model/vbd";
 import { BUZZ_MAX_POINTS, buzzTweakPoints } from "@/lib/trade-model/weights";
 
-const neutralLeague: LeagueContext = { superflex: false, ppr: 1, leagueSize: 12 };
+const neutralLeague: LeagueContext = {
+  ...DEFAULT_STARTING_SLOTS,
+  superflex: false,
+  ppr: 1,
+  leagueSize: 12,
+};
 
 function neutralProviders(teamTier: number, teamMissing: boolean): TradeModelProviders {
   const t = { tier01: teamTier, missing: teamMissing };
@@ -48,10 +56,15 @@ function seedWrProfiles(): Record<string, PlayerFantasyProfile> {
 
 function mkFp(extra: Record<string, PlayerFantasyProfile>, ppr: LeagueContext["ppr"] = 1) {
   const profiles = { ...seedWrProfiles(), ...extra };
+  const league: LeagueContext = { ...DEFAULT_STARTING_SLOTS, superflex: false, ppr, leagueSize: 12 };
+  const vbd = computeVbdComputation(profiles, ppr, league);
   return {
     snapshotAsOf: "2099-01-01",
     profiles,
     anchors: buildFpAnchors(profiles, ppr),
+    richAnchors: buildRichStatAnchors(profiles, ppr),
+    vbdBySleeperId: vbd.bySleeperId,
+    vbdScale: vbd.scale,
   };
 }
 
@@ -62,6 +75,7 @@ const fixedPlayer = {
   trendingAdds: 4,
   age: 25,
   yearsExp: 3,
+  nflDraftRound: null as number | null,
 };
 
 describe("scorePlayer", () => {
@@ -100,7 +114,13 @@ describe("scorePlayer", () => {
         seasons: { "2025": wrSeason(48), "2024": wrSeason(40) },
       },
     });
-    const buzz = { searchRank: 400, trendingAdds: 10, age: 24, yearsExp: 2 };
+    const buzz = {
+      searchRank: 400,
+      trendingAdds: 10,
+      age: 24,
+      yearsExp: 2,
+      nflDraftRound: null as number | null,
+    };
     const star = scorePlayer(
       { sleeperPlayerId: "star", teamAbbr: "CIN", positionLabel: "WR", ...buzz },
       neutralProviders(0.5, true),
@@ -167,7 +187,18 @@ describe("productionBaseTradePoints elite tail", () => {
       },
     };
     const anchors = buildFpAnchors(profiles, 1);
-    const r = productionBaseTradePoints(profiles.neg, "WR", 1, anchors);
+    const richAnchors = buildRichStatAnchors(profiles, 1);
+    const league: LeagueContext = { ...DEFAULT_STARTING_SLOTS, superflex: false, ppr: 1, leagueSize: 12 };
+    const vbd = computeVbdComputation(profiles, 1, league);
+    const fp = {
+      snapshotAsOf: "2099-01-01",
+      profiles,
+      anchors,
+      richAnchors,
+      vbdBySleeperId: vbd.bySleeperId,
+      vbdScale: vbd.scale,
+    };
+    const r = productionBaseTradePoints(profiles.neg, "WR", 1, fp);
     expect(Number.isFinite(r.basePoints)).toBe(true);
     expect(Number.isFinite(r.combinedNorm01)).toBe(true);
   });
@@ -190,8 +221,19 @@ describe("productionBaseTradePoints elite tail", () => {
       },
     };
     const anchors = buildFpAnchors(profiles, 1);
-    const a = productionBaseTradePoints(profiles.eliteA, "WR", 1, anchors);
-    const b = productionBaseTradePoints(profiles.eliteB, "WR", 1, anchors);
+    const richAnchors = buildRichStatAnchors(profiles, 1);
+    const league: LeagueContext = { ...DEFAULT_STARTING_SLOTS, superflex: false, ppr: 1, leagueSize: 12 };
+    const vbd = computeVbdComputation(profiles, 1, league);
+    const fp = {
+      snapshotAsOf: "2099-01-01",
+      profiles,
+      anchors,
+      richAnchors,
+      vbdBySleeperId: vbd.bySleeperId,
+      vbdScale: vbd.scale,
+    };
+    const a = productionBaseTradePoints(profiles.eliteA, "WR", 1, fp);
+    const b = productionBaseTradePoints(profiles.eliteB, "WR", 1, fp);
     expect(b.basePoints).toBeGreaterThan(a.basePoints);
     expect(b.basePoints - a.basePoints).toBeGreaterThan(400);
   });

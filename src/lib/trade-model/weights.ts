@@ -21,12 +21,38 @@ export const MODEL_WEIGHTS = {
   pickFutureDiscountPerYear: 180,
   leagueFormatReceiverPoints: 180,
   leagueFormatSizePoints: 120,
+  /** Retrospective VBD nudge (scaled vs league p10–p90 band). */
+  vbdPoints: 400,
+  /** NFL draft round tier nudge (early rounds bump value for young résumés). */
+  draftCapitalPoints: 160,
 } as const;
 
 /** Max absolute trade points added from Sleeper search rank + trending adds. */
 export const BUZZ_MAX_POINTS = 140;
 
 const NEUTRAL = 0.5;
+
+function clamp01w(n: number): number {
+  return Math.max(0, Math.min(1, n));
+}
+
+/** Map NFL draft round (1–7) to a 0–1 tier for a small trade nudge; unknown/undrafted → neutral. */
+export function nflDraftRoundTier01(round: number | null): { tier01: number; missing: boolean } {
+  if (round == null || !Number.isFinite(round) || round < 1) {
+    return { tier01: NEUTRAL, missing: true };
+  }
+  const r = Math.min(7, Math.floor(round));
+  const table: Record<number, number> = {
+    1: 0.9,
+    2: 0.8,
+    3: 0.68,
+    4: 0.58,
+    5: 0.52,
+    6: 0.48,
+    7: 0.46,
+  };
+  return { tier01: clamp01w(table[r] ?? 0.45), missing: false };
+}
 
 /**
  * Small market-sentiment nudge from Sleeper signals (not the value spine).

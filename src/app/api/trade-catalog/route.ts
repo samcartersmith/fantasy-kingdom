@@ -2,11 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import curatedSnapshotJson from "@/data/trade-model/curated-snapshot.json";
 import fantasyProfileJson from "@/data/trade-model/player-fantasy-profile.json";
 import { applyPickFairTradeModel, getLocalPickAssets } from "@/lib/catalog";
-import { buildFpAnchors } from "@/lib/trade-model/fp-baseline";
+import draftRoundJson from "@/data/trade-model/player-nfl-draft-round.json";
+import { buildFpAnchors, buildRichStatAnchors } from "@/lib/trade-model/fp-baseline";
 import type { FantasyProfilePayload } from "@/lib/trade-model/fp-baseline";
 import { createCuratedProviders } from "@/lib/trade-model/providers";
-import type { CuratedTradeSnapshot, LeagueContext, LeagueSize, PprMode } from "@/lib/trade-model/types";
-import { TRADE_MODEL_VERSION } from "@/lib/trade-model/types";
+import type { CuratedTradeSnapshot, LeagueContext, LeagueSize, PprMode, StartingSlotCounts } from "@/lib/trade-model/types";
+import { DEFAULT_STARTING_SLOTS, TRADE_MODEL_VERSION } from "@/lib/trade-model/types";
+import { computeVbdComputation } from "@/lib/trade-model/vbd";
 import { fetchSleeperNflPlayersMap, fetchSleeperTrendingAdds } from "@/lib/sleeper-fetch";
 import { SLEEPER_NFL_PLAYERS_URL, SLEEPER_PLAYERS_REVALIDATE_SECONDS } from "@/lib/sleeper-constants";
 import { sleeperPlayersMapToCatalog, sleeperPlayersMapToCatalogModeled } from "@/lib/sleeper-map";
@@ -16,6 +18,8 @@ export const revalidate = 86_400;
 
 const curatedSnapshot = curatedSnapshotJson as CuratedTradeSnapshot;
 const fantasyProfilePayload = fantasyProfileJson as FantasyProfilePayload;
+
+const nflDraftRoundBySleeperId = draftRoundJson as Record<string, number>;
 
 function parseLeagueSize(raw: string | null): LeagueSize {
   const n = Number(raw);
@@ -29,11 +33,22 @@ function parsePpr(raw: string | null): PprMode {
   return 1;
 }
 
+function parseStartSlot(raw: string | null, fallback: StartingSlotCounts[keyof StartingSlotCounts]): 1 | 2 | 3 | 4 {
+  const n = Number(raw);
+  if (n === 1 || n === 2 || n === 3 || n === 4) return n;
+  return fallback;
+}
+
 function parseLeagueContext(searchParams: URLSearchParams): LeagueContext {
   return {
     superflex: searchParams.get("superflex") === "1",
     ppr: parsePpr(searchParams.get("ppr")),
     leagueSize: parseLeagueSize(searchParams.get("league_size")),
+    startQb: parseStartSlot(searchParams.get("start_qb"), DEFAULT_STARTING_SLOTS.startQb),
+    startRb: parseStartSlot(searchParams.get("start_rb"), DEFAULT_STARTING_SLOTS.startRb),
+    startWr: parseStartSlot(searchParams.get("start_wr"), DEFAULT_STARTING_SLOTS.startWr),
+    startTe: parseStartSlot(searchParams.get("start_te"), DEFAULT_STARTING_SLOTS.startTe),
+    startFlex: parseStartSlot(searchParams.get("start_flex"), DEFAULT_STARTING_SLOTS.startFlex),
   };
 }
 
@@ -77,12 +92,24 @@ export async function GET(request: NextRequest) {
     } else {
       const providers = createCuratedProviders(curatedSnapshot);
       const anchors = buildFpAnchors(fantasyProfilePayload.profiles, league.ppr);
+      const richAnchors = buildRichStatAnchors(fantasyProfilePayload.profiles, league.ppr);
+      const vbd = computeVbdComputation(fantasyProfilePayload.profiles, league.ppr, league);
       const fp = {
         snapshotAsOf: fantasyProfilePayload.snapshotAsOf,
         profiles: fantasyProfilePayload.profiles,
         anchors,
+        richAnchors,
+        vbdBySleeperId: vbd.bySleeperId,
+        vbdScale: vbd.scale,
       };
-      players = sleeperPlayersMapToCatalogModeled(playersResult.data, trendingAdds, providers, league, fp);
+      players = sleeperPlayersMapToCatalogModeled(
+        playersResult.data,
+        trendingAdds,
+        providers,
+        league,
+        fp,
+        nflDraftRoundBySleeperId,
+      );
       picks = applyPickFairTradeModel(picks, providers);
       meta = {
         pickCount: picks.length,
@@ -97,7 +124,7 @@ export async function GET(request: NextRequest) {
         fantasyProfileSource: fantasyProfilePayload.source,
         leagueContext: league,
         valueBasis:
-          "Fair-trade model v2: fantasy points spine (Sleeper season stats snapshot, positional + global blend) plus smaller curated and age nudges. Sleeper buzz is a capped sentiment tweak. Superflex and PPR are baked into server values for the requested league context.",
+          "Fair-trade model v2.1: nflverse fantasy spine with optional usage blend, league-aware retrospective VBD (starter counts + flex split), draft-capital nudge, curated tiers, age, capped buzz. PPR, superflex, league size, and starting roster slots are baked into server values for the requested context.",
       };
     }
 

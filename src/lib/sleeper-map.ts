@@ -73,6 +73,7 @@ export function sleeperPlayersMapToCatalogModeled(
   providers: TradeModelProviders,
   league: LeagueContext,
   fp: FpScoringContext,
+  nflDraftRoundBySleeperId: Record<string, number>,
 ): CatalogAsset[] {
   const out: CatalogAsset[] = [];
 
@@ -106,6 +107,10 @@ export function sleeperPlayersMapToCatalogModeled(
         trendingAdds: ta,
         age,
         yearsExp: typeof raw.years_exp === "number" && Number.isFinite(raw.years_exp) ? raw.years_exp : null,
+        nflDraftRound:
+          typeof nflDraftRoundBySleeperId[pidStr] === "number" && Number.isFinite(nflDraftRoundBySleeperId[pidStr])
+            ? nflDraftRoundBySleeperId[pidStr]!
+            : null,
       },
       providers,
       league,

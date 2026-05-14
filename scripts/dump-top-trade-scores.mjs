@@ -7,7 +7,10 @@
 import https from "node:https";
 import {
   buildFpAnchors,
+  buildRichStatAnchors,
+  computeVbdComputation,
   createProviders,
+  DEFAULT_STARTING_SLOTS,
   displayName,
   loadRepoJson,
   resolveAge,
@@ -56,9 +59,19 @@ async function main() {
   const curated = loadRepoJson("src/data/trade-model/curated-snapshot.json");
   const playersMap = await getJson("https://api.sleeper.app/v1/players/nfl");
 
-  const league = { superflex: false, ppr: 1, leagueSize: 12 };
+  const draftRounds = loadRepoJson("src/data/trade-model/player-nfl-draft-round.json");
+
+  const league = { ...DEFAULT_STARTING_SLOTS, superflex: false, ppr: 1, leagueSize: 12 };
   const anchors = buildFpAnchors(fantasy.profiles, league.ppr);
-  const fp = { profiles: fantasy.profiles, anchors };
+  const richAnchors = buildRichStatAnchors(fantasy.profiles, league.ppr);
+  const vbd = computeVbdComputation(fantasy.profiles, league.ppr, league);
+  const fp = {
+    profiles: fantasy.profiles,
+    anchors,
+    richAnchors,
+    vbdBySleeperId: vbd.bySleeperId,
+    vbdScale: vbd.scale,
+  };
   const providers = createProviders(curated);
 
   const rows = [];
@@ -83,6 +96,7 @@ async function main() {
         trendingAdds: 0,
         age: resolveAge(raw),
         yearsExp: typeof raw.years_exp === "number" ? raw.years_exp : null,
+        nflDraftRound: typeof draftRounds[pid] === "number" && Number.isFinite(draftRounds[pid]) ? draftRounds[pid] : null,
       },
       providers,
       league,

@@ -14,14 +14,13 @@ type Props = {
   superflex: boolean;
   /** When true, `asset.value` already reflects league format from the server (no client QB bump). */
   leagueFormatApplied: boolean;
+  /** Assets already on either trade side — hidden from per-team search suggestions. */
+  excludeAssetIds: ReadonlySet<string>;
   onAddAsset: (asset: CatalogAsset) => void;
   onRemove: (lineId: string) => void;
   /** Increment to replay one-shot add highlight on this side. */
   flashTick?: number;
 };
-
-const addBtnClass =
-  "cursor-pointer motion-safe:transition motion-safe:duration-150 motion-safe:active:scale-[0.97] min-h-9 shrink-0 text-xs font-semibold px-3 rounded-[var(--dash-radius-sm)] bg-dash-primary text-dash-text hover:bg-dash-primary/90";
 
 const teamSearchInputClass =
   "w-full min-h-10 rounded-[var(--dash-radius-sm)] border border-white/15 bg-black/35 px-3 py-2 text-sm text-dash-text placeholder:text-dash-text/40";
@@ -36,6 +35,7 @@ export function TeamSide({
   lines,
   superflex,
   leagueFormatApplied,
+  excludeAssetIds,
   onAddAsset,
   onRemove,
   flashTick = 0,
@@ -64,19 +64,19 @@ export function TeamSide({
   const total = lines.reduce((acc, { asset }) => acc + effectiveValue(asset, effOpts), 0);
   const isEmpty = lines.length === 0;
 
-  const teamSuggestions = useMemo(
-    () =>
-      filterTradeCatalogSuggestions(
-        catalog,
-        teamQuery,
-        { superflex, leagueFormatApplied },
-        {
-          includeEmptyQueryDefaults: false,
-          queryMatchCap: 20,
-        },
-      ),
-    [catalog, teamQuery, superflex, leagueFormatApplied],
-  );
+  const teamSuggestions = useMemo(() => {
+    const raw = filterTradeCatalogSuggestions(
+      catalog,
+      teamQuery,
+      { superflex, leagueFormatApplied },
+      {
+        includeEmptyQueryDefaults: false,
+        queryMatchCap: 20,
+      },
+    );
+    if (excludeAssetIds.size === 0) return raw;
+    return raw.filter((a) => !excludeAssetIds.has(a.id));
+  }, [catalog, teamQuery, superflex, leagueFormatApplied, excludeAssetIds]);
 
   const handleAddFromSearch = (asset: CatalogAsset) => {
     onAddAsset(asset);
@@ -167,15 +167,17 @@ export function TeamSide({
         {teamSuggestions.length > 0 ? (
           <ul className={suggestionListClass} role="list">
             {teamSuggestions.map((asset) => (
-              <li
-                key={asset.id}
-                className="flex items-center justify-between gap-2 px-2 py-2 bg-black/20 hover:bg-white/[0.06] transition-colors"
-              >
-                <div className="min-w-0 flex items-center gap-2 flex-1">
+              <li key={asset.id} className="p-0">
+                <button
+                  type="button"
+                  onClick={() => handleAddFromSearch(asset)}
+                  aria-label={`Add ${asset.name} to ${title}`}
+                  className="w-full text-left flex items-center gap-2 px-2 py-2 min-h-11 bg-black/20 hover:bg-white/[0.06] transition-colors cursor-pointer motion-safe:transition motion-safe:duration-150 motion-safe:active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-dash-primary"
+                >
                   {asset.kind === "player" ? (
                     <PlayerHeadshot imageUrl={asset.imageUrl} name={asset.name} />
                   ) : null}
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <p className="font-medium text-sm text-dash-text truncate">{asset.name}</p>
                     <p className="text-[11px] font-mono text-dash-text/55 truncate">
                       {asset.kind === "pick"
@@ -192,9 +194,6 @@ export function TeamSide({
                       ) : null}
                     </p>
                   </div>
-                </div>
-                <button type="button" onClick={() => handleAddFromSearch(asset)} className={addBtnClass}>
-                  Add
                 </button>
               </li>
             ))}
