@@ -1,5 +1,5 @@
 /** Semantic version of the explainable trade model (bump when weights or snapshot schema change). */
-export const TRADE_MODEL_VERSION = "3.1.0";
+export const TRADE_MODEL_VERSION = "3.2.0";
 
 export type PprMode = 0 | 0.5 | 1;
 

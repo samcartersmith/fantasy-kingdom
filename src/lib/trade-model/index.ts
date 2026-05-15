@@ -28,6 +28,7 @@ export {
   fpRecencyWeights,
   presentFpSeasonKeysDesc,
   FP_SEASON_ORDER_DESC,
+  attenuateParticipation01TowardNeutral,
 } from "@/lib/trade-model/fp-baseline";
 export type {
   FantasyProfilePayload,
@@ -38,6 +39,14 @@ export type {
   TradeSpineLayer,
 } from "@/lib/trade-model/fp-baseline";
 export { buildTradeSpinePrecompute } from "@/lib/trade-model/trade-spine";
+export {
+  LOW_HISTORY_RB_GAMES_TO_NEUTRAL_BLEND,
+  LOW_HISTORY_RB_MAX_YEARS_EXP,
+  imputedRbRankBaseFromPrior01,
+  imputedRbVbd01FromPrior01,
+  qualifiesLowHistoryRbTradeRescue,
+  rbProspectPrior01,
+} from "@/lib/trade-model/low-history-rb";
 export { computeVbdComputation } from "@/lib/trade-model/vbd";
 export type { VbdComputation } from "@/lib/trade-model/vbd";
 export { MODEL_WEIGHTS, applyLeagueFormatToPlayerValue, BUZZ_MAX_POINTS, buzzTweakPoints, nflDraftRoundTier01 } from "@/lib/trade-model/weights";

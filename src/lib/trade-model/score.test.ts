@@ -73,6 +73,48 @@ function mkFp(extra: Record<string, PlayerFantasyProfile>, ppr: LeagueContext["p
   };
 }
 
+function rbSeason(pts: number, games = 17) {
+  return { pts_ppr: pts, pts_half_ppr: Math.max(0, pts - 15), pts_std: Math.max(0, pts - 30), games };
+}
+
+function mkFpRb(extra: Record<string, PlayerFantasyProfile>, ppr: LeagueContext["ppr"] = 1) {
+  const filler: Record<string, PlayerFantasyProfile> = {};
+  for (let i = 0; i < 10; i++) {
+    filler[`rb_fill_${i}`] = {
+      primaryPosition: "RB",
+      seasons: { "2025": rbSeason(280 - i * 8), "2024": rbSeason(250 - i * 8) },
+    };
+  }
+  const profiles = { ...seedWrProfiles(), ...filler, ...extra };
+  const league: LeagueContext = { ...DEFAULT_STARTING_SLOTS, superflex: false, ppr, leagueSize: 12 };
+  const anchors = buildFpAnchors(profiles, ppr);
+  const richAnchors = buildRichStatAnchors(profiles, ppr);
+  const vbd = computeVbdComputation(profiles, ppr, league);
+  const tradeSpine = buildTradeSpinePrecompute(profiles, ppr, vbd.bySleeperId, richAnchors, anchors);
+  return {
+    snapshotAsOf: "2099-01-01",
+    profiles,
+    anchors,
+    richAnchors,
+    vbdBySleeperId: vbd.bySleeperId,
+    vbdScale: vbd.scale,
+    tradeSpine,
+  };
+}
+
+function strongRbCuratedProviders(): TradeModelProviders {
+  const neutral = { tier01: 0.5, missing: true };
+  const t = { tier01: 0.55, missing: false };
+  return {
+    teamOffense: { getTeamOffense: () => t },
+    coordinator: { getOcQuality: () => neutral },
+    history: { getHistoryTier: () => ({ tier01: 0.7, missing: false }) },
+    role: { getRoleTier: () => ({ tier01: 0.82, missing: false }) },
+    injury: { getAvailabilityTier: () => neutral },
+    draftClass: { getClassStrength01: () => neutral },
+  };
+}
+
 const fixedPlayer = {
   sleeperPlayerId: "999",
   positionLabel: "WR",
@@ -145,6 +187,51 @@ describe("scorePlayer", () => {
     const lowBuzz = buzzTweakPoints(2000, 0, BUZZ_MAX_POINTS);
     const highBuzz = buzzTweakPoints(1, 120, BUZZ_MAX_POINTS);
     expect(Math.abs(highBuzz - lowBuzz)).toBeLessThanOrEqual(2 * BUZZ_MAX_POINTS + 5);
+  });
+
+  it("raises NFL rookie RB with empty FP seasons above same profile once years_exp is veteran-sized", () => {
+    const fp = mkFpRb({
+      rook_empty: { primaryPosition: "RB", seasons: {} },
+    });
+    const common = {
+      sleeperPlayerId: "rook_empty",
+      teamAbbr: "DAL",
+      positionLabel: "RB",
+      searchRank: 400,
+      trendingAdds: 5,
+      age: 21,
+      nflDraftRound: 1 as number | null,
+    };
+    const rookie = scorePlayer({ ...common, yearsExp: 0 }, strongRbCuratedProviders(), neutralLeague, fp);
+    const notRescue = scorePlayer({ ...common, yearsExp: 4 }, strongRbCuratedProviders(), neutralLeague, fp);
+    expect(rookie.value).toBeGreaterThan(notRescue.value);
+  });
+
+  it("does not reduce second-year RB value vs same stats with more years_exp", () => {
+    const fp = mkFpRb({
+      soph: {
+        primaryPosition: "RB",
+        seasons: { "2025": rbSeason(38, 11), "2024": rbSeason(22, 8) },
+      },
+      vetTwin: {
+        primaryPosition: "RB",
+        seasons: { "2025": rbSeason(38, 11), "2024": rbSeason(22, 8) },
+      },
+    });
+    const buzz = { teamAbbr: "CIN", positionLabel: "RB", searchRank: 200, trendingAdds: 2, nflDraftRound: 2 as number | null };
+    const soph = scorePlayer(
+      { sleeperPlayerId: "soph", ...buzz, age: 23, yearsExp: 1 },
+      strongRbCuratedProviders(),
+      neutralLeague,
+      fp,
+    );
+    const vetTwin = scorePlayer(
+      { sleeperPlayerId: "vetTwin", ...buzz, age: 26, yearsExp: 3 },
+      strongRbCuratedProviders(),
+      neutralLeague,
+      fp,
+    );
+    expect(soph.value).toBeGreaterThanOrEqual(vetTwin.value);
   });
 });
 
