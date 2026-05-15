@@ -48,7 +48,7 @@ For the same league context (starters + flex split as in [`src/lib/trade-model/v
 
 where **dyn** is a **peak-years** factor from age/position (same idea as the old VBD dynasty weight in [`src/lib/trade-model/age-curve.ts`](../src/lib/trade-model/age-curve.ts)). Constants **`spineVbdFloor` / `spineVbdSpan`** are in [`src/lib/trade-model/weights.ts`](../src/lib/trade-model/weights.ts).
 
-**Missing / zero FP profile**: neutral rank base + neutral VBD norm; the line is marked **missing** and confidence drops.
+**Missing / zero FP profile**: neutral rank base + neutral VBD norm; the line is marked **missing** and confidence drops. **RB** with Sleeper `years_exp` **0 or 1** still receive a **low-history spine floor** from draft + curated role + curated history so rookies and true sophomores are not valued like proven depth (see [`low-history-rb.ts`](../src/lib/trade-model/low-history-rb.ts)); unknown `years_exp` opts out of that floor.
 
 The UI breakdown still shows a single line keyed **`fantasyProduction`** whose label states that it includes the merged VBD.
 
@@ -56,7 +56,7 @@ The UI breakdown still shows a single line keyed **`fantasyProduction`** whose l
 
 ## 3. Step 2 — Games played / durability
 
-When a fantasy snapshot row exists and production is not missing, the model adds a **smaller** adjustment from games played vs a **17-game** full-season reference (see `gamesParticipation01FromProfile` in [`fp-baseline.ts`](../src/lib/trade-model/fp-baseline.ts)).
+When a fantasy snapshot row exists and production is not missing, the model adds a **smaller** adjustment from games played vs a **17-game** full-season reference (see `gamesParticipation01FromProfile` in [`fp-baseline.ts`](../src/lib/trade-model/fp-baseline.ts)). For **RB** with `years_exp` **0 or 1**, that participation signal is **softened toward neutral** before scoring so short rookie samples are not read as veteran injury risk.
 
 If there is **no** usable snapshot row, this step is skipped and **curated “recent form” fallback** may apply instead.
 

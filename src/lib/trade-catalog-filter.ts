@@ -3,11 +3,19 @@ import { effectiveValue } from "@/lib/trade-types";
 
 export type TradeCatalogEffOpts = { superflex: boolean; leagueFormatApplied?: boolean };
 
+/** Players below this trade index (0–10,000 scale) are hidden from per-team sidebar search only; main catalog search still lists them. */
+export const TEAM_SIDEBAR_SEARCH_MIN_PLAYER_VALUE = 1500;
+
 export type FilterTradeCatalogOptions = {
   /** When the query is blank, include draft picks + top players (trade calculator default). If false, return []. */
   includeEmptyQueryDefaults?: boolean;
   /** Max rows when the query is non-empty (default 40). */
   queryMatchCap?: number;
+  /**
+   * When set, `kind === "player"` rows with effective value **strictly below** this threshold are dropped.
+   * Draft picks are never filtered by this option.
+   */
+  minPlayerEffectiveValue?: number;
 };
 
 /**
@@ -39,17 +47,25 @@ export function filterTradeCatalogSuggestions(
     return [...picks, ...topPlayers];
   }
 
-  const matches = catalog.filter((a) => {
+  let matches = catalog.filter((a) => {
     const blob = [a.name, a.position, a.team, a.kind]
       .filter(Boolean)
       .join(" ")
       .toLowerCase();
     return blob.includes(q);
   });
+
+  const minPv = options.minPlayerEffectiveValue;
+  if (typeof minPv === "number" && Number.isFinite(minPv) && minPv > 0) {
+    matches = matches.filter(
+      (a) => a.kind !== "player" || effectiveValue(a, effOpts) >= minPv,
+    );
+  }
+
   matches.sort((a, b) => {
-    const ap = a.kind === "pick" ? 0 : 1;
-    const bp = b.kind === "pick" ? 0 : 1;
-    if (ap !== bp) return ap - bp;
+    const vb = effectiveValue(b, effOpts);
+    const va = effectiveValue(a, effOpts);
+    if (vb !== va) return vb - va;
     return a.name.localeCompare(b.name);
   });
   return matches.slice(0, queryCap);

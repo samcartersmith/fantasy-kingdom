@@ -398,6 +398,13 @@ export function gamesParticipation01FromProfile(profile: PlayerFantasyProfile | 
   return clamp01(maxG / 17);
 }
 
+/** Pull participation01 toward 0.5; `blend` 1 = no change, 0 = force neutral. */
+export function attenuateParticipation01TowardNeutral(participation01: number, blend: number): number {
+  const NEUTRAL = 0.5;
+  const b = Math.max(0, Math.min(1, blend));
+  return clamp01(NEUTRAL + (participation01 - NEUTRAL) * b);
+}
+
 /** Primary skill position from catalog label (matches profile.primaryPosition). */
 export function primarySkillFromLabel(positionLabel: string): SkillPosition | null {
   const parts = positionLabel.split(",").map((p) => p.trim().toUpperCase());

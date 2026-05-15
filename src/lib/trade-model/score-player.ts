@@ -1,10 +1,18 @@
 import { ageCurve01, peakYearsRemaining01 } from "@/lib/trade-model/age-curve";
 import {
+  attenuateParticipation01TowardNeutral,
   type FpScoringContext,
   gamesParticipation01FromProfile,
   weightedPpg,
   weightedSeasonTotals,
 } from "@/lib/trade-model/fp-baseline";
+import {
+  LOW_HISTORY_RB_GAMES_TO_NEUTRAL_BLEND,
+  imputedRbRankBaseFromPrior01,
+  imputedRbVbd01FromPrior01,
+  qualifiesLowHistoryRbTradeRescue,
+  rbProspectPrior01,
+} from "@/lib/trade-model/low-history-rb";
 import {
   RANK_BASE_NEUTRAL_MISSING,
   RANK_BASE_NEUTRAL_WEAK,
@@ -55,6 +63,10 @@ export function scorePlayer(
   const { weightedPts } = profile ? weightedSeasonTotals(profile, league.ppr) : { weightedPts: 0 };
   const { wppg } = profile ? weightedPpg(profile, league.ppr) : { wppg: 0 };
 
+  const draftT = nflDraftRoundTier01(input.nflDraftRound);
+  const historyForPrior = providers.history.getHistoryTier(input.sleeperPlayerId);
+  const roleForPrior = providers.role.getRoleTier(input.sleeperPlayerId);
+
   let rankBase: number;
   let vbdN: number;
   let prodMissing: boolean;
@@ -73,6 +85,19 @@ export function scorePlayer(
     prodMissing = false;
   }
 
+  if (qualifiesLowHistoryRbTradeRescue(input.positionLabel, input.yearsExp)) {
+    const prior = rbProspectPrior01({
+      draftTier01: draftT.tier01,
+      draftMissing: draftT.missing,
+      roleTier01: roleForPrior.tier01,
+      roleMissing: roleForPrior.missing,
+      historyTier01: historyForPrior.tier01,
+      historyMissing: historyForPrior.missing,
+    });
+    rankBase = Math.max(rankBase, imputedRbRankBaseFromPrior01(prior));
+    vbdN = Math.max(vbdN, imputedRbVbd01FromPrior01(prior));
+  }
+
   const pk = peakYearsRemaining01(input.age, input.positionLabel);
   const dyn = pk.missing ? 1 : 0.35 + 0.65 * pk.years01;
   const mult = MODEL_WEIGHTS.spineVbdFloor + MODEL_WEIGHTS.spineVbdSpan * vbdN * dyn;
@@ -85,7 +110,6 @@ export function scorePlayer(
     missing: prodMissing,
   });
 
-  const draftT = nflDraftRoundTier01(input.nflDraftRound);
   const draftAdj = (draftT.tier01 - NEUTRAL) * MODEL_WEIGHTS.draftCapitalPoints;
   components.push({
     key: "draftCapital",
@@ -95,7 +119,10 @@ export function scorePlayer(
   });
 
   if (profile && !prodMissing) {
-    const games01 = gamesParticipation01FromProfile(profile, league.ppr);
+    let games01 = gamesParticipation01FromProfile(profile, league.ppr);
+    if (qualifiesLowHistoryRbTradeRescue(input.positionLabel, input.yearsExp)) {
+      games01 = attenuateParticipation01TowardNeutral(games01, LOW_HISTORY_RB_GAMES_TO_NEUTRAL_BLEND);
+    }
     const durAdj = (games01 - NEUTRAL) * MODEL_WEIGHTS.gamesPlayedPoints;
     components.push({
       key: "gamesPlayed",
@@ -103,13 +130,12 @@ export function scorePlayer(
       contribution: durAdj,
     });
   } else {
-    const hist = providers.history.getHistoryTier(input.sleeperPlayerId);
-    const histAdj = (hist.tier01 - NEUTRAL) * MODEL_WEIGHTS.curatedHistoryPoints;
+    const histAdj = (historyForPrior.tier01 - NEUTRAL) * MODEL_WEIGHTS.curatedHistoryPoints;
     components.push({
       key: "historyCurated",
       label: "Recent form fallback (curated — used when fantasy snapshot lacks this player)",
       contribution: histAdj,
-      missing: hist.missing,
+      missing: historyForPrior.missing,
     });
   }
 
@@ -132,7 +158,7 @@ export function scorePlayer(
     missing: oc.missing,
   });
 
-  const role = providers.role.getRoleTier(input.sleeperPlayerId);
+  const role = roleForPrior;
   const roleAdj = (role.tier01 - NEUTRAL) * MODEL_WEIGHTS.rolePoints;
   components.push({
     key: "role",

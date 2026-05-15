@@ -3,7 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import type { CatalogAsset, LineItem } from "@/lib/trade-types";
 import { catalogPositionIncludesQb, effectiveValue } from "@/lib/trade-types";
-import { filterTradeCatalogSuggestions } from "@/lib/trade-catalog-filter";
+import {
+  TEAM_SIDEBAR_SEARCH_MIN_PLAYER_VALUE,
+  filterTradeCatalogSuggestions,
+} from "@/lib/trade-catalog-filter";
 import { PlayerHeadshot } from "@/components/trade/PlayerHeadshot";
 
 type Props = {
@@ -72,6 +75,7 @@ export function TeamSide({
       {
         includeEmptyQueryDefaults: false,
         queryMatchCap: 20,
+        minPlayerEffectiveValue: TEAM_SIDEBAR_SEARCH_MIN_PLAYER_VALUE,
       },
     );
     if (excludeAssetIds.size === 0) return raw;
