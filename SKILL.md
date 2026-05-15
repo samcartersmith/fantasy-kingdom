@@ -88,17 +88,20 @@ When generating design-system guidance, use this structure:
 
 <!-- TYPEUI_SH_MANAGED_END -->
 
-## Fantasy Kingdom (project implementation)
+<h2 style="font-size: clamp(1.5rem, 2.4vw, 1.875rem); font-weight: 700; line-height: 1.15; margin-top: 2.75rem; margin-bottom: 1rem; letter-spacing: -0.02em;">Fantasy Kingdom (project implementation)</h2>
 
 This section extends the Dashboard skill for **this repo only**. Do not edit the TypeUI-managed block above when updating universal copy.
 
-### Tokens ([`src/app/globals.css`](src/app/globals.css))
+**Heading scale (this repo’s UI):** Prefer **`globals.css`** utilities: **`.dash-heading-page`** on tool page **`h1`** (`--dash-type-page-title-*`). **`.dash-heading-section`** on trade **`h2`** only — **Comparison**, **Add players or picks**, and **dialog titles** (Trade Evaluation, Starting lineup) (`--dash-type-section-title-*`). **`.dash-heading-subsection`** on **`h3`** — **Team 1** and **Team 2** card titles in [`TeamSide`](src/components/trade/TeamSide.tsx) and **package column titles** in the evaluate modal (`--dash-type-subsection-*`). Pair all with **`text-dash-text`**. **Fairness**-style blocks in the evaluate modal use **`h4`**: **`text-sm font-semibold uppercase tracking-wide text-dash-text/70`**. Do not use `text-sm` / `text-base` for an **`h2`** on these surfaces.
+
+<h3 style="font-size: clamp(1.0625rem, 1.35vw, 1.25rem); font-weight: 600; line-height: 1.3; margin-top: 1.75rem; margin-bottom: 0.6rem; letter-spacing: -0.01em;">Tokens (<a href="src/app/globals.css"><code>src/app/globals.css</code></a>)</h3>
 
 - **`--dash-border`**: `rgba(255, 255, 255, 0.45)` — the **strong** rim for **`.dash-glass-panel`** and nested roster tiles. Exposed in Tailwind as **`border-dash-border`** / **`divide-dash-border`**. Plain form controls in trade often use **`border-white/10`** or **`border-white/15`** instead (see Structural borders).
 - **`--dash-ring`**: optional semantic ring color for Tailwind via `--color-dash-ring` in `@theme inline` (use `ring-dash-ring` when aligning focus/utility rings with tokens).
 - **`--dash-glass`**: panel fill; keep hierarchy: surface, then glass fill, then border.
+- **Page / section headings**: **`--dash-type-page-title-*`**, **`--dash-type-section-title-*`**, and **`--dash-type-subsection-*`** plus **`.dash-heading-page`**, **`.dash-heading-section`**, and **`.dash-heading-subsection`** in [`globals.css`](src/app/globals.css). Trade **`h1`** / **`h2`** / **`h3`** (Team cards) use these classes with **`text-dash-text`** (see **Heading scale** above).
 
-### Structural borders
+<h3 style="font-size: clamp(1.0625rem, 1.35vw, 1.25rem); font-weight: 600; line-height: 1.3; margin-top: 1.75rem; margin-bottom: 0.6rem; letter-spacing: -0.01em;">Structural borders</h3>
 
 - **Glass panels** (`.dash-glass-panel`): use **`border-dash-border`** / `var(--dash-border)` (`rgba(255, 255, 255, 0.45)`) — this is the strong outer rim for dashboard cards.
 - **Softer controls inside trade** (so they don’t compete with the panel edge): **native `<select>`** (`.dash-trade-select` + Tailwind **`border-white/15`**), **text search inputs**, **catalog suggestion `<ul>`** (container **`border-white/10`**, row dividers **`divide-white/10`**), the **TotalsSummary** share bar (**`border-white/10`**), and **Clear both sides** (**`border-white/15`**) use lower-opacity whites instead of `border-dash-border`.
@@ -106,28 +109,31 @@ This section extends the Dashboard skill for **this repo only**. Do not edit the
 - For **internal row dividers** in the soft suggestion lists, use **`divide-white/10`** (not `divide-dash-border`).
 - **Exceptions**: semantic accents (`border-dash-danger/30`, `border-dash-secondary/60`), loading spinners, intentional hero sections.
 
-### Glass panels
+<h3 style="font-size: clamp(1.0625rem, 1.35vw, 1.25rem); font-weight: 600; line-height: 1.3; margin-top: 1.75rem; margin-bottom: 0.6rem; letter-spacing: -0.01em;">Glass panels</h3>
 
 - Prefer **one** edge treatment: `.dash-glass-panel` already sets `border: 1px solid var(--dash-border)`. Avoid stacking faint `ring-white/[0.06]` on the same node unless there is a deliberate double-rim design.
 - Accent rings (e.g. comparison `ring-dash-primary/25`, error `ring-dash-danger`) are intentional exceptions.
 
-### Interaction and motion
+<h3 style="font-size: clamp(1.0625rem, 1.35vw, 1.25rem); font-weight: 600; line-height: 1.3; margin-top: 1.75rem; margin-bottom: 0.6rem; letter-spacing: -0.01em;">Interaction and motion</h3>
 
 - **Primary actions** (e.g. trade "Add to team", ranking tabs, primary `Link` buttons): use `cursor-pointer`, `motion-safe:transition` + `motion-safe:duration-150`, and `motion-safe:active:scale-[0.97]` (or similar) for press feedback.
 - **`prefers-reduced-motion`**: global rules shorten transitions/animations; do not rely on looping decorative motion. Purposeful feedback (e.g. one-shot add highlight) should still allow **`aria-live="polite"`** announcements.
 - Keep **focus-visible** rings on interactive controls (outline/focus ring patterns unchanged).
 
-### Trade calculator ([`src/components/trade/TradeCalculator.tsx`](src/components/trade/TradeCalculator.tsx), [`src/components/trade/TeamSide.tsx`](src/components/trade/TeamSide.tsx))
+<h3 style="font-size: clamp(1.0625rem, 1.35vw, 1.25rem); font-weight: 600; line-height: 1.3; margin-top: 1.75rem; margin-bottom: 0.6rem; letter-spacing: -0.01em;">Trade calculator (<a href="src/components/trade/TradeCalculator.tsx"><code>TradeCalculator.tsx</code></a>, <a href="src/components/trade/TeamSide.tsx"><code>TeamSide.tsx</code></a>)</h3>
 
-- **Per-team card**: each `TeamSide` receives the full **`catalog`** plus **`onAddAsset`**; a **search field and suggestions** live in the card (typed query uses [`filterTradeCatalogSuggestions`](src/lib/trade-catalog-filter.ts) with `includeEmptyQueryDefaults: false`; empty query shows no rows). **Roster rows render above the search**; **Subtotal** stays in the header when the side is non-empty.
+- **Per-team card**: each `TeamSide` uses **`h3`** with **`.dash-heading-subsection`** for **Team 1** / **Team 2**; it receives the full **`catalog`** plus **`onAddAsset`**; a **search field and suggestions** live in the card (typed query uses [`filterTradeCatalogSuggestions`](src/lib/trade-catalog-filter.ts) with `includeEmptyQueryDefaults: false`; empty query shows no rows). **Roster rows render above the search**; **Subtotal** stays in the header when the side is non-empty.
 - **Global catalog block** below the grid still offers “Add to team 1 / 2” for the same catalog.
 - **Main catalog panel**: **Tabs** (`Picks`, `QB`, `RB`, `WR`, `TE`) sit above the search; the active tab **scopes** assets (picks only, or players whose `position` string includes that skill via [`catalogPlayerHasSkillPosition`](src/lib/trade-types.ts)), then [`filterTradeCatalogSuggestions`](src/lib/trade-catalog-filter.ts) applies the search query on that subset. Tab buttons mirror the [`RankingsExplorer`](src/components/rankings/RankingsExplorer.tsx) pattern (`role="tablist"` / `role="tab"`, selected `bg-dash-primary`).
 - **Add to team**: increments a per-side `flashTick` passed to `TeamSide`; the panel runs the **`dash-animate-team-flash`** class (keyframes `dash-team-flash` in globals) under `prefers-reduced-motion: no-preference`.
 - **Screen readers**: hidden live region announces `Added {name} to Team {n}.` on each add (`aria-live="polite"`, `aria-atomic="true"`).
+- **Trade Evaluation modal** ([`TradeEvaluateModal.tsx`](src/components/trade/TradeEvaluateModal.tsx)): dialog title is **`h2`** with **`.dash-heading-section`**; **Team 1 / Team 2 package** column titles are **`h3`** with **`.dash-heading-subsection`**; Fairness / balance blocks are **`h4`** (`text-sm font-semibold uppercase tracking-wide text-dash-text/70`).
+- **Right sidebar (wide viewports)**: The trade route uses [`layout.tsx`](src/app/trade/layout.tsx) to allow a **wider inner shell** (`max-w-[90rem]`) than the global `main` cap so the calculator can stay **`max-w-[72rem]`** (original tool width) while a **`2xl:` grid** adds a **sticky `aside`** for featured links in the extra horizontal lane. **TotalsSummary** lives in that main column with controls + teams + catalog. Sidebar promo titles use **`h3`** + **`.dash-heading-subsection`**; links match header-style **focus-visible** rings and primary hover color.
 - **Borders in trade UI**: **Card shells** use the glass panel token (**`border-dash-border`**). **Selects**, **search fields**, **suggestion dropdown lists** (border + **`divide-white/10`**), the **comparison value bar**, and **Clear** use **softer** `border-white/10` / **`border-white/15`** as documented above. **Roster `<li>`** tiles use **`border-dash-border`**.
 
-### QA (code review)
+<h3 style="font-size: clamp(1.0625rem, 1.35vw, 1.25rem); font-weight: 600; line-height: 1.3; margin-top: 1.75rem; margin-bottom: 0.6rem; letter-spacing: -0.01em;">QA (code review)</h3>
 
+- Trade **headings**: tool **`h1`** → **`.dash-heading-page`**; **`h2`** (Comparison, Add players or picks, dialog titles) → **`.dash-heading-section`**; **Team 1 / Team 2** card titles **`h3`** → **`.dash-heading-subsection`** per [`globals.css`](src/app/globals.css) / **Heading scale** in this skill.
 - Glass **panel** borders use **`border-dash-border`**; softer trade controls (select, search, suggestion lists, value bar, Clear) use **`border-white/10|15`** as in the skill — roster lines stay **`border-dash-border`**.
 - No accidental double-faint rings on `dash-glass-panel`.
 - Buttons show pointer + press affordance; reduced-motion users still get live text for trade adds.

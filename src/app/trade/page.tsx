@@ -5,7 +5,7 @@ export default function TradePage() {
   return (
     <div className="space-y-8">
       <header className="max-w-3xl">
-        <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-dash-text">
+        <h1 className="dash-heading-page text-dash-text">
           Trade calculator
         </h1>
       </header>

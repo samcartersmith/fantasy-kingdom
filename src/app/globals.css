@@ -16,6 +16,19 @@
   --dash-glass: rgba(255, 255, 255, 0.06);
   --dash-radius-sm: 8px;
   --dash-radius-md: 12px;
+  /* Tool page title (h1) — matches Tailwind text-4xl font-bold tracking-tight */
+  --dash-type-page-title-size: 2.25rem;
+  --dash-type-page-title-line-height: 2.5rem;
+  --dash-type-page-title-tracking: -0.025em;
+  /* Section title (h2) on trade-style surfaces — matches text-3xl font-bold tracking-tight */
+  --dash-type-section-title-size: 1.875rem;
+  --dash-type-section-title-line-height: 2.25rem;
+  --dash-type-section-title-tracking: -0.025em;
+  /* Column / card title (h3) — Team 1 / Team 2; matches text-lg sm:text-xl font-semibold tracking-tight */
+  --dash-type-subsection-size: 1.125rem;
+  --dash-type-subsection-size-sm: 1.25rem;
+  --dash-type-subsection-line-height: 1.75rem;
+  --dash-type-subsection-tracking: -0.025em;
 }
 
 @theme inline {
@@ -49,6 +62,36 @@ body {
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--dash-border);
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 8px 32px rgba(0, 0, 0, 0.35);
+}
+
+/** Tool page primary title (h1) — use with text-dash-text */
+.dash-heading-page {
+  font-size: var(--dash-type-page-title-size);
+  line-height: var(--dash-type-page-title-line-height);
+  font-weight: 700;
+  letter-spacing: var(--dash-type-page-title-tracking);
+}
+
+/** Major section title (h2) on trade / dialog surfaces — use with text-dash-text */
+.dash-heading-section {
+  font-size: var(--dash-type-section-title-size);
+  line-height: var(--dash-type-section-title-line-height);
+  font-weight: 700;
+  letter-spacing: var(--dash-type-section-title-tracking);
+}
+
+/** Card / column title (h3) — Team 1 & Team 2 on trade grid and evaluate modal packages — use with text-dash-text */
+.dash-heading-subsection {
+  font-size: var(--dash-type-subsection-size);
+  line-height: var(--dash-type-subsection-line-height);
+  font-weight: 600;
+  letter-spacing: var(--dash-type-subsection-tracking);
+}
+
+@media (min-width: 640px) {
+  .dash-heading-subsection {
+    font-size: var(--dash-type-subsection-size-sm);
+  }
 }
 
 /* Native <select> with matching horizontal inset: text and chevron sit the same distance from each edge */
