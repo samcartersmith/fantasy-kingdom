@@ -18,6 +18,7 @@ import { fileURLToPath } from "node:url";
 import {
   buildFpAnchors,
   buildRichStatAnchors,
+  buildTradeSpinePrecompute,
   computeVbdComputation,
   createProviders,
   DEFAULT_STARTING_SLOTS,
@@ -34,7 +35,6 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const COMPONENT_KEYS = [
   "fantasyProduction",
-  "vbdDynasty",
   "draftCapital",
   "gamesPlayed",
   "historyCurated",
@@ -51,7 +51,6 @@ const COMPONENT_KEYS = [
 
 const MISSING_KEYS = [
   "missing_fantasyProduction",
-  "missing_vbdDynasty",
   "missing_draftCapital",
   "missing_historyCurated",
   "missing_teamOffense",
@@ -201,7 +200,6 @@ function contributionMap(components) {
 function missingFlags(components) {
   const keyToCol = {
     fantasyProduction: "missing_fantasyProduction",
-    vbdDynasty: "missing_vbdDynasty",
     draftCapital: "missing_draftCapital",
     historyCurated: "missing_historyCurated",
     teamOffense: "missing_teamOffense",
@@ -398,12 +396,15 @@ async function main() {
   const anchors = buildFpAnchors(fantasy.profiles, league.ppr);
   const richAnchors = buildRichStatAnchors(fantasy.profiles, league.ppr);
   const vbd = computeVbdComputation(fantasy.profiles, league.ppr, league);
+  const tradeSpine = buildTradeSpinePrecompute(fantasy.profiles, league.ppr, vbd.bySleeperId, richAnchors, anchors);
   const fp = {
+    snapshotAsOf: fantasy.snapshotAsOf ?? "",
     profiles: fantasy.profiles,
     anchors,
     richAnchors,
     vbdBySleeperId: vbd.bySleeperId,
     vbdScale: vbd.scale,
+    tradeSpine,
   };
   const providers = createProviders(curated);
 

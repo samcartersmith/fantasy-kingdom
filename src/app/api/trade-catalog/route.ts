@@ -4,6 +4,7 @@ import fantasyProfileJson from "@/data/trade-model/player-fantasy-profile.json";
 import { applyPickFairTradeModel, getLocalPickAssets } from "@/lib/catalog";
 import draftRoundJson from "@/data/trade-model/player-nfl-draft-round.json";
 import { buildFpAnchors, buildRichStatAnchors } from "@/lib/trade-model/fp-baseline";
+import { buildTradeSpinePrecompute } from "@/lib/trade-model/trade-spine";
 import type { FantasyProfilePayload } from "@/lib/trade-model/fp-baseline";
 import { createCuratedProviders } from "@/lib/trade-model/providers";
 import type { CuratedTradeSnapshot, LeagueContext, LeagueSize, PprMode, StartingSlotCounts } from "@/lib/trade-model/types";
@@ -94,6 +95,13 @@ export async function GET(request: NextRequest) {
       const anchors = buildFpAnchors(fantasyProfilePayload.profiles, league.ppr);
       const richAnchors = buildRichStatAnchors(fantasyProfilePayload.profiles, league.ppr);
       const vbd = computeVbdComputation(fantasyProfilePayload.profiles, league.ppr, league);
+      const tradeSpine = buildTradeSpinePrecompute(
+        fantasyProfilePayload.profiles,
+        league.ppr,
+        vbd.bySleeperId,
+        richAnchors,
+        anchors,
+      );
       const fp = {
         snapshotAsOf: fantasyProfilePayload.snapshotAsOf,
         profiles: fantasyProfilePayload.profiles,
@@ -101,6 +109,7 @@ export async function GET(request: NextRequest) {
         richAnchors,
         vbdBySleeperId: vbd.bySleeperId,
         vbdScale: vbd.scale,
+        tradeSpine,
       };
       players = sleeperPlayersMapToCatalogModeled(
         playersResult.data,
@@ -124,7 +133,7 @@ export async function GET(request: NextRequest) {
         fantasyProfileSource: fantasyProfilePayload.source,
         leagueContext: league,
         valueBasis:
-          "Fair-trade model v2.1: nflverse fantasy spine with optional usage blend, league-aware retrospective VBD (starter counts + flex split), draft-capital nudge, curated tiers, age, capped buzz. PPR, superflex, league size, and starting roster slots are baked into server values for the requested context.",
+          "Fair-trade model v3: composite FP+usage rank spine with league VBD merged into production, curated tiers, capped buzz; player values mapped to 0–10,000 per catalog request. PPR, superflex, league size, and starting roster slots are baked into server values for the requested context.",
       };
     }
 

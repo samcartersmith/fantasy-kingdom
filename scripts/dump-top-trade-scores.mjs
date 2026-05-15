@@ -8,6 +8,7 @@ import https from "node:https";
 import {
   buildFpAnchors,
   buildRichStatAnchors,
+  buildTradeSpinePrecompute,
   computeVbdComputation,
   createProviders,
   DEFAULT_STARTING_SLOTS,
@@ -65,12 +66,15 @@ async function main() {
   const anchors = buildFpAnchors(fantasy.profiles, league.ppr);
   const richAnchors = buildRichStatAnchors(fantasy.profiles, league.ppr);
   const vbd = computeVbdComputation(fantasy.profiles, league.ppr, league);
+  const tradeSpine = buildTradeSpinePrecompute(fantasy.profiles, league.ppr, vbd.bySleeperId, richAnchors, anchors);
   const fp = {
+    snapshotAsOf: fantasy.snapshotAsOf ?? "",
     profiles: fantasy.profiles,
     anchors,
     richAnchors,
     vbdBySleeperId: vbd.bySleeperId,
     vbdScale: vbd.scale,
+    tradeSpine,
   };
   const providers = createProviders(curated);
 

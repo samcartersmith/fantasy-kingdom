@@ -21,8 +21,9 @@ export const MODEL_WEIGHTS = {
   pickFutureDiscountPerYear: 180,
   leagueFormatReceiverPoints: 180,
   leagueFormatSizePoints: 120,
-  /** Retrospective VBD nudge (scaled vs league p10–p90 band). */
-  vbdPoints: 400,
+  /** Rank spine × merged VBD: `rankBase × (floor + span × vbdPos01 × dyn)`. */
+  spineVbdFloor: 0.48,
+  spineVbdSpan: 1.12,
   /** NFL draft round tier nudge (early rounds bump value for young résumés). */
   draftCapitalPoints: 160,
 } as const;
