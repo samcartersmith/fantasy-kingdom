@@ -54,6 +54,12 @@ export type RichStatAnchors = {
   qbPassingEpa: FpQuantileBand | null;
 };
 
+/** Precomputed rank spine + per-position VBD norm for merging in scorePlayer (see trade-spine.ts). */
+export type TradeSpineLayer = {
+  rankBaseBySleeperId: Record<string, number>;
+  vbdPosNorm01BySleeperId: Record<string, number>;
+};
+
 export type FpScoringContext = {
   snapshotAsOf: string;
   profiles: Record<string, PlayerFantasyProfile>;
@@ -62,11 +68,13 @@ export type FpScoringContext = {
   richAnchors: RichStatAnchors | null;
   /**
    * Retrospective VBD proxy: weighted fantasy points minus worst-starter baseline for this league’s
-   * starting counts (see `computeVbdComputation`). Empty when not computed.
+   * starting counts (see `computeVbdComputation`). Still used for spine merge; not a separate UI line.
    */
   vbdBySleeperId: Record<string, number>;
-  /** p10/p90 style band for mapping raw VBD to a capped trade-point nudge. */
+  /** Legacy global VBD band; optional for diagnostics / scripts. */
   vbdScale: { lo: number; hi: number } | null;
+  /** Composite rank + per-position VBD normalization merged into fantasy production in scorePlayer. */
+  tradeSpine: TradeSpineLayer;
 };
 
 const SKILL_ORDER: SkillPosition[] = ["QB", "RB", "WR", "TE"];
@@ -209,7 +217,8 @@ export function buildRichStatAnchors(profiles: Record<string, PlayerFantasyProfi
   };
 }
 
-function richUsageNorm01(
+/** 0–1 usage / efficiency signal for composite rank (WR/TE share, RB touches/g, QB EPA). */
+export function computeRichUsageNorm01(
   profile: PlayerFantasyProfile,
   primary: SkillPosition,
   richAnchors: RichStatAnchors | null,
@@ -364,7 +373,7 @@ export function productionBaseTradePoints(
 
   const g = constants.globalBlend;
   const blendedPts = (1 - g) * posNorm + g * globalNorm;
-  const usage01 = richUsageNorm01(profile, primary, fp.richAnchors);
+  const usage01 = computeRichUsageNorm01(profile, primary, fp.richAnchors);
   const rb = constants.richStatBlend;
   const blendedRaw = (1 - rb) * blendedPts + rb * usage01;
   const combinedNorm01 = stretchCombinedNorm01(blendedRaw);
@@ -378,6 +387,15 @@ export function productionBaseTradePoints(
   const missing = weightedPts <= 0 && wppg <= 0;
 
   return { basePoints, combinedNorm01, missing, gamesParticipation01 };
+}
+
+/** Games-weighted participation vs a 17-game season (durability line item). */
+export function gamesParticipation01FromProfile(profile: PlayerFantasyProfile | undefined, ppr: PprMode): number {
+  if (!profile) return 0.5;
+  const { gamesWeight } = weightedPpg(profile, ppr);
+  const seasonKeys = presentFpSeasonKeysDesc(profile.seasons);
+  const maxG = Math.max(0, ...seasonKeys.map((y) => profile.seasons[y]?.games ?? 0), gamesWeight);
+  return clamp01(maxG / 17);
 }
 
 /** Primary skill position from catalog label (matches profile.primaryPosition). */

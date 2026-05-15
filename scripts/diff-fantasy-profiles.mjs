@@ -16,6 +16,7 @@ import { fileURLToPath } from "node:url";
 import {
   buildFpAnchors,
   buildRichStatAnchors,
+  buildTradeSpinePrecompute,
   computeVbdComputation,
   createProviders,
   DEFAULT_STARTING_SLOTS,
@@ -180,19 +181,25 @@ async function main() {
   const richC = buildRichStatAnchors(cProfiles, league.ppr);
   const vbdB = computeVbdComputation(bProfiles, league.ppr, league);
   const vbdC = computeVbdComputation(cProfiles, league.ppr, league);
+  const tradeSpineB = buildTradeSpinePrecompute(bProfiles, league.ppr, vbdB.bySleeperId, richB, anchorsB);
+  const tradeSpineC = buildTradeSpinePrecompute(cProfiles, league.ppr, vbdC.bySleeperId, richC, anchorsC);
   const fpB = {
+    snapshotAsOf: baselinePayload.snapshotAsOf ?? "",
     profiles: bProfiles,
     anchors: anchorsB,
     richAnchors: richB,
     vbdBySleeperId: vbdB.bySleeperId,
     vbdScale: vbdB.scale,
+    tradeSpine: tradeSpineB,
   };
   const fpC = {
+    snapshotAsOf: candidatePayload.snapshotAsOf ?? "",
     profiles: cProfiles,
     anchors: anchorsC,
     richAnchors: richC,
     vbdBySleeperId: vbdC.bySleeperId,
     vbdScale: vbdC.scale,
+    tradeSpine: tradeSpineC,
   };
 
   const ids = [];

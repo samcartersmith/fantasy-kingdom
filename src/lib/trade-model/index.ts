@@ -35,7 +35,9 @@ export type {
   FpScoringContext,
   PlayerFantasyProfile,
   RichStatAnchors,
+  TradeSpineLayer,
 } from "@/lib/trade-model/fp-baseline";
+export { buildTradeSpinePrecompute } from "@/lib/trade-model/trade-spine";
 export { computeVbdComputation } from "@/lib/trade-model/vbd";
 export type { VbdComputation } from "@/lib/trade-model/vbd";
 export { MODEL_WEIGHTS, applyLeagueFormatToPlayerValue, BUZZ_MAX_POINTS, buzzTweakPoints, nflDraftRoundTier01 } from "@/lib/trade-model/weights";

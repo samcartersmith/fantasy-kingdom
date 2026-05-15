@@ -1,8 +1,14 @@
 import { ageCurve01, peakYearsRemaining01 } from "@/lib/trade-model/age-curve";
 import {
   type FpScoringContext,
-  productionBaseTradePoints,
+  gamesParticipation01FromProfile,
+  weightedPpg,
+  weightedSeasonTotals,
 } from "@/lib/trade-model/fp-baseline";
+import {
+  RANK_BASE_NEUTRAL_MISSING,
+  RANK_BASE_NEUTRAL_WEAK,
+} from "@/lib/trade-model/trade-spine";
 import type { EvaluationComponent, LeagueContext, PlayerScoreInput, ScoreResult, TradeModelProviders } from "@/lib/trade-model/types";
 import {
   BUZZ_MAX_POINTS,
@@ -17,11 +23,12 @@ import {
 import { SUPERFLEX_QB_MULTIPLIER } from "@/lib/trade-types";
 
 const NEUTRAL = 0.5;
-const VALUE_MIN = 400;
-const VALUE_MAX = 19_000;
+/** Wide internal clamp before catalog maps to 0–10,000 display. */
+const INTERNAL_VALUE_MIN = 300;
+const INTERNAL_VALUE_MAX = 48_000;
 
-function clampValue(n: number): number {
-  return Math.round(Math.max(VALUE_MIN, Math.min(VALUE_MAX, n)));
+function clampValueInternal(n: number): number {
+  return Math.round(Math.max(INTERNAL_VALUE_MIN, Math.min(INTERNAL_VALUE_MAX, n)));
 }
 
 function isReceiverHeavyPosition(positionLabel: string): boolean {
@@ -45,36 +52,37 @@ export function scorePlayer(
   const components: EvaluationComponent[] = [];
 
   const profile = fp.profiles[input.sleeperPlayerId];
-  const prod = productionBaseTradePoints(profile, input.positionLabel, league.ppr, fp);
+  const { weightedPts } = profile ? weightedSeasonTotals(profile, league.ppr) : { weightedPts: 0 };
+  const { wppg } = profile ? weightedPpg(profile, league.ppr) : { wppg: 0 };
+
+  let rankBase: number;
+  let vbdN: number;
+  let prodMissing: boolean;
+
+  if (!profile) {
+    rankBase = RANK_BASE_NEUTRAL_MISSING;
+    vbdN = 0.5;
+    prodMissing = true;
+  } else if (weightedPts <= 0 && wppg <= 0) {
+    rankBase = RANK_BASE_NEUTRAL_WEAK;
+    vbdN = 0.5;
+    prodMissing = true;
+  } else {
+    rankBase = fp.tradeSpine.rankBaseBySleeperId[input.sleeperPlayerId] ?? RANK_BASE_NEUTRAL_WEAK;
+    vbdN = fp.tradeSpine.vbdPosNorm01BySleeperId[input.sleeperPlayerId] ?? 0.5;
+    prodMissing = false;
+  }
+
+  const pk = peakYearsRemaining01(input.age, input.positionLabel);
+  const dyn = pk.missing ? 1 : 0.35 + 0.65 * pk.years01;
+  const mult = MODEL_WEIGHTS.spineVbdFloor + MODEL_WEIGHTS.spineVbdSpan * vbdN * dyn;
+  const spinePts = Math.round(rankBase * mult);
 
   components.push({
     key: "fantasyProduction",
-    label: "Fantasy production (recent seasons, PPR-aware + usage blend)",
-    contribution: prod.basePoints,
-    missing: prod.missing,
-  });
-
-  const vbdRaw = fp.vbdBySleeperId[input.sleeperPlayerId];
-  let vbdMissing = true;
-  let vbdContrib = 0;
-  if (vbdRaw != null && Number.isFinite(vbdRaw)) {
-    if (fp.vbdScale && fp.vbdScale.hi > fp.vbdScale.lo) {
-      vbdMissing = false;
-      const norm = clamp01((vbdRaw - fp.vbdScale.lo) / (fp.vbdScale.hi - fp.vbdScale.lo));
-      const baseAdj = (norm - NEUTRAL) * 2 * MODEL_WEIGHTS.vbdPoints;
-      const pk = peakYearsRemaining01(input.age, input.positionLabel);
-      const dyn = pk.missing ? 1 : 0.35 + 0.65 * pk.years01;
-      vbdContrib = Math.round(baseAdj * dyn);
-    } else {
-      vbdMissing = false;
-      vbdContrib = Math.round(Math.tanh(vbdRaw / 95) * MODEL_WEIGHTS.vbdPoints * 0.85);
-    }
-  }
-  components.push({
-    key: "vbdDynasty",
-    label: "League VBD proxy (retrospective FP vs starter baselines × peak years)",
-    contribution: vbdContrib,
-    missing: vbdMissing,
+    label: "Trade spine (composite rank: FP + usage; league VBD merged × peak years)",
+    contribution: spinePts,
+    missing: prodMissing,
   });
 
   const draftT = nflDraftRoundTier01(input.nflDraftRound);
@@ -86,8 +94,9 @@ export function scorePlayer(
     missing: draftT.missing,
   });
 
-  if (profile && !prod.missing) {
-    const durAdj = (prod.gamesParticipation01 - NEUTRAL) * MODEL_WEIGHTS.gamesPlayedPoints;
+  if (profile && !prodMissing) {
+    const games01 = gamesParticipation01FromProfile(profile, league.ppr);
+    const durAdj = (games01 - NEUTRAL) * MODEL_WEIGHTS.gamesPlayedPoints;
     components.push({
       key: "gamesPlayed",
       label: "Games played / availability (from stat seasons)",
@@ -197,10 +206,10 @@ export function scorePlayer(
     });
   }
 
-  const value = clampValue(withLeague);
+  const value = clampValueInternal(withLeague);
 
   let conf = 1;
-  if (prod.missing) conf -= 0.22;
+  if (prodMissing) conf -= 0.22;
   for (const c of components) {
     if (c.missing) conf -= 0.07;
   }

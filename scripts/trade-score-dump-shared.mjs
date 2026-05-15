@@ -22,12 +22,13 @@ export const MODEL_WEIGHTS = {
   futureBlendPoints: 200,
   leagueFormatReceiverPoints: 180,
   leagueFormatSizePoints: 120,
-  vbdPoints: 400,
+  spineVbdFloor: 0.48,
+  spineVbdSpan: 1.12,
   draftCapitalPoints: 160,
 };
 export const FP_BASE = { baseMin: 1400, baseSpan: 11_200, globalBlend: 0.45, richStatBlend: 0.09 };
-export const VALUE_MIN = 400;
-export const VALUE_MAX = 19_000;
+export const INTERNAL_VALUE_MIN = 300;
+export const INTERNAL_VALUE_MAX = 48_000;
 export const SKILL_ORDER = ["QB", "RB", "WR", "TE"];
 
 export const DEFAULT_STARTING_SLOTS = {
@@ -51,7 +52,7 @@ export function clamp01(n) {
 }
 
 export function clampValue(n) {
-  return Math.round(Math.max(VALUE_MIN, Math.min(VALUE_MAX, n)));
+  return Math.round(Math.max(INTERNAL_VALUE_MIN, Math.min(INTERNAL_VALUE_MAX, n)));
 }
 
 export function pickPts(row, ppr) {
@@ -262,6 +263,111 @@ export function productionBaseTradePoints(profile, fp, ppr) {
   return { basePoints, combinedNorm01, missing, gamesParticipation01 };
 }
 
+export const COMPOSITE_FP_WEIGHT = 0.76;
+export const RANK_CURVE_EXPONENT = 0.22;
+export const RANK_BASE_MIN = 2200;
+export const RANK_BASE_SPAN = 17_800;
+export const RANK_BASE_SPAN_TE = 10_200;
+export const RANK_BASE_NEUTRAL_WEAK = 3600;
+export const RANK_BASE_NEUTRAL_MISSING = 5200;
+export const ELITE_CLUSTER_BY_POS = { QB: 6, RB: 8, WR: 10, TE: 6 };
+export const ELITE_CURVE_BOTTOM = 0.91;
+
+export function rankCurve01(idx, n, pos) {
+  if (n <= 1) return 1;
+  const K = Math.min(ELITE_CLUSTER_BY_POS[pos], n);
+  if (idx < K) {
+    const denom = Math.max(K - 1, 1);
+    return 1 - (1 - ELITE_CURVE_BOTTOM) * (idx / denom);
+  }
+  const m = n - K;
+  if (m <= 0) return ELITE_CURVE_BOTTOM;
+  const j = idx - K;
+  const uTail = m <= 1 ? 0 : j / (m - 1);
+  return ELITE_CURVE_BOTTOM * (1 - uTail ** RANK_CURVE_EXPONENT);
+}
+
+function buildLogPtsAnchorsPerPosition(profiles, ppr) {
+  const byPos = { QB: [], RB: [], WR: [], TE: [] };
+  for (const p of Object.values(profiles)) {
+    const pos = p.primaryPosition;
+    const { weightedPts } = weightedSeasonTotals(p, ppr);
+    if (weightedPts > 0) byPos[pos].push(Math.log1p(weightedPts));
+  }
+  const out = { QB: null, RB: null, WR: null, TE: null };
+  for (const pos of SKILL_ORDER) {
+    const arr = byPos[pos].sort((x, y) => x - y);
+    out[pos] = quantileAnchors(arr, 0.05, 0.95);
+  }
+  return out;
+}
+
+export function buildTradeSpinePrecompute(profiles, ppr, vbdBySleeperId, richAnchors, _anchors) {
+  const logAnchors = buildLogPtsAnchorsPerPosition(profiles, ppr);
+  const rankBaseBySleeperId = {};
+  const vbdPosNorm01BySleeperId = {};
+  const VBD_POS_Q_LO = 0.08;
+  const VBD_POS_Q_HI = 0.92;
+
+  for (const pos of SKILL_ORDER) {
+    const rows = [];
+    for (const [id, profile] of Object.entries(profiles)) {
+      if (profile.primaryPosition !== pos) continue;
+      const { weightedPts } = weightedSeasonTotals(profile, ppr);
+      const { wppg } = weightedPpg(profile, ppr);
+      if (weightedPts <= 0 && wppg <= 0) continue;
+      const logPts = Math.log1p(Math.max(0, weightedPts));
+      const fpNorm = normFromAnchors(logPts, logAnchors[pos]);
+      const rich01 = richUsageNorm01(profile, pos, richAnchors);
+      const composite = COMPOSITE_FP_WEIGHT * fpNorm + (1 - COMPOSITE_FP_WEIGHT) * rich01;
+      rows.push({ id, profile, composite, weightedPts, wppg });
+    }
+    rows.sort((a, b) => {
+      if (b.composite !== a.composite) return b.composite - a.composite;
+      if (b.weightedPts !== a.weightedPts) return b.weightedPts - a.weightedPts;
+      return b.wppg - a.wppg;
+    });
+    const n = rows.length;
+    for (let idx = 0; idx < n; idx++) {
+      const curve01 = rankCurve01(idx, n, pos);
+      const span = pos === "TE" ? RANK_BASE_SPAN_TE : RANK_BASE_SPAN;
+      rankBaseBySleeperId[rows[idx].id] = Math.round(RANK_BASE_MIN + span * curve01);
+    }
+    const vbdVals = rows
+      .map((r) => vbdBySleeperId[r.id])
+      .filter((x) => typeof x === "number" && Number.isFinite(x))
+      .sort((a, b) => a - b);
+    let lo = 0;
+    let hi = 1;
+    if (vbdVals.length >= 4) {
+      lo = vbdVals[Math.max(0, Math.floor(VBD_POS_Q_LO * (vbdVals.length - 1)))];
+      hi = vbdVals[Math.min(vbdVals.length - 1, Math.ceil(VBD_POS_Q_HI * (vbdVals.length - 1)))];
+      if (!(hi > lo)) {
+        lo = vbdVals[0];
+        hi = vbdVals[vbdVals.length - 1] + 1e-6;
+      }
+    } else if (vbdVals.length > 0) {
+      lo = vbdVals[0];
+      hi = vbdVals[vbdVals.length - 1] + 1e-6;
+    }
+    for (const r of rows) {
+      const raw = vbdBySleeperId[r.id];
+      const norm =
+        typeof raw === "number" && Number.isFinite(raw) && hi > lo ? clamp01((raw - lo) / (hi - lo)) : 0.5;
+      vbdPosNorm01BySleeperId[r.id] = norm;
+    }
+  }
+  return { rankBaseBySleeperId, vbdPosNorm01BySleeperId };
+}
+
+export function gamesParticipation01FromProfile(profile, ppr) {
+  if (!profile) return 0.5;
+  const { gamesWeight } = weightedPpg(profile, ppr);
+  const seasonKeys = presentFpSeasonKeysDesc(profile.seasons);
+  const maxG = Math.max(0, ...seasonKeys.map((y) => profile.seasons[y]?.games ?? 0), gamesWeight);
+  return clamp01(maxG / 17);
+}
+
 export function flexStartersPerSkill(leagueSize, startFlex) {
   const pool = leagueSize * startFlex;
   if (pool <= 0) return { rb: 0, wr: 0, te: 0 };
@@ -441,36 +547,37 @@ export function displayName(raw) {
 export function scorePlayerDetailed(input, providers, league, fp) {
   const components = [];
   const profile = fp.profiles[input.sleeperPlayerId];
-  const prod = productionBaseTradePoints(profile, fp, league.ppr);
+  const { weightedPts } = profile ? weightedSeasonTotals(profile, league.ppr) : { weightedPts: 0 };
+  const { wppg } = profile ? weightedPpg(profile, league.ppr) : { wppg: 0 };
+
+  let rankBase;
+  let vbdN;
+  let prodMissing;
+
+  if (!profile) {
+    rankBase = RANK_BASE_NEUTRAL_MISSING;
+    vbdN = 0.5;
+    prodMissing = true;
+  } else if (weightedPts <= 0 && wppg <= 0) {
+    rankBase = RANK_BASE_NEUTRAL_WEAK;
+    vbdN = 0.5;
+    prodMissing = true;
+  } else {
+    rankBase = fp.tradeSpine.rankBaseBySleeperId[input.sleeperPlayerId] ?? RANK_BASE_NEUTRAL_WEAK;
+    vbdN = fp.tradeSpine.vbdPosNorm01BySleeperId[input.sleeperPlayerId] ?? 0.5;
+    prodMissing = false;
+  }
+
+  const pk = peakYearsRemaining01(input.age, input.positionLabel);
+  const dyn = pk.missing ? 1 : 0.35 + 0.65 * pk.years01;
+  const mult = MODEL_WEIGHTS.spineVbdFloor + MODEL_WEIGHTS.spineVbdSpan * vbdN * dyn;
+  const spinePts = Math.round(rankBase * mult);
 
   components.push({
     key: "fantasyProduction",
-    label: "Fantasy production (recent seasons, PPR-aware + usage blend)",
-    contribution: prod.basePoints,
-    missing: prod.missing,
-  });
-
-  const vbdRaw = fp.vbdBySleeperId?.[input.sleeperPlayerId];
-  let vbdMissing = true;
-  let vbdContrib = 0;
-  if (vbdRaw != null && Number.isFinite(vbdRaw)) {
-    if (fp.vbdScale && fp.vbdScale.hi > fp.vbdScale.lo) {
-      vbdMissing = false;
-      const norm = clamp01((vbdRaw - fp.vbdScale.lo) / (fp.vbdScale.hi - fp.vbdScale.lo));
-      const baseAdj = (norm - NEUTRAL) * 2 * MODEL_WEIGHTS.vbdPoints;
-      const pk = peakYearsRemaining01(input.age, input.positionLabel);
-      const dyn = pk.missing ? 1 : 0.35 + 0.65 * pk.years01;
-      vbdContrib = Math.round(baseAdj * dyn);
-    } else {
-      vbdMissing = false;
-      vbdContrib = Math.round(Math.tanh(vbdRaw / 95) * MODEL_WEIGHTS.vbdPoints * 0.85);
-    }
-  }
-  components.push({
-    key: "vbdDynasty",
-    label: "League VBD proxy (retrospective FP vs starter baselines × peak years)",
-    contribution: vbdContrib,
-    missing: vbdMissing,
+    label: "Trade spine (composite rank: FP + usage; league VBD merged × peak years)",
+    contribution: spinePts,
+    missing: prodMissing,
   });
 
   const draftT = nflDraftRoundTier01(input.nflDraftRound ?? null);
@@ -481,8 +588,9 @@ export function scorePlayerDetailed(input, providers, league, fp) {
     missing: draftT.missing,
   });
 
-  if (profile && !prod.missing) {
-    const durAdj = (prod.gamesParticipation01 - NEUTRAL) * MODEL_WEIGHTS.gamesPlayedPoints;
+  if (profile && !prodMissing) {
+    const games01 = gamesParticipation01FromProfile(profile, league.ppr);
+    const durAdj = (games01 - NEUTRAL) * MODEL_WEIGHTS.gamesPlayedPoints;
     components.push({
       key: "gamesPlayed",
       label: "Games played / availability (from stat seasons)",
@@ -575,7 +683,7 @@ export function scorePlayerDetailed(input, providers, league, fp) {
   });
 
   const preSuperflex = components.reduce((a, c) => a + c.contribution, 0);
-  const withLeague = applyLeagueFormatToPlayerValue(preSuperflex, league, input.positionLabel);
+  const withLeague = applyLeagueFormatToPlayerValue(preSuperflex, league, input.positionLabel, SUPERFLEX_QB_MULTIPLIER);
 
   if (league.superflex && isQuarterbackOnly(input.positionLabel)) {
     components.push({
@@ -588,7 +696,7 @@ export function scorePlayerDetailed(input, providers, league, fp) {
   const value = clampValue(withLeague);
 
   let conf = 1;
-  if (prod.missing) conf -= 0.22;
+  if (prodMissing) conf -= 0.22;
   for (const c of components) {
     if (c.missing) conf -= 0.07;
   }

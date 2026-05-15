@@ -8,6 +8,7 @@ import {
   type PlayerFantasyProfile,
 } from "@/lib/trade-model/fp-baseline";
 import { scorePlayer } from "@/lib/trade-model/score-player";
+import { buildTradeSpinePrecompute } from "@/lib/trade-model/trade-spine";
 import { scorePick } from "@/lib/trade-model/score-pick";
 import type { LeagueContext, TradeModelProviders } from "@/lib/trade-model/types";
 import { DEFAULT_STARTING_SLOTS } from "@/lib/trade-model/types";
@@ -57,14 +58,18 @@ function seedWrProfiles(): Record<string, PlayerFantasyProfile> {
 function mkFp(extra: Record<string, PlayerFantasyProfile>, ppr: LeagueContext["ppr"] = 1) {
   const profiles = { ...seedWrProfiles(), ...extra };
   const league: LeagueContext = { ...DEFAULT_STARTING_SLOTS, superflex: false, ppr, leagueSize: 12 };
+  const anchors = buildFpAnchors(profiles, ppr);
+  const richAnchors = buildRichStatAnchors(profiles, ppr);
   const vbd = computeVbdComputation(profiles, ppr, league);
+  const tradeSpine = buildTradeSpinePrecompute(profiles, ppr, vbd.bySleeperId, richAnchors, anchors);
   return {
     snapshotAsOf: "2099-01-01",
     profiles,
-    anchors: buildFpAnchors(profiles, ppr),
-    richAnchors: buildRichStatAnchors(profiles, ppr),
+    anchors,
+    richAnchors,
     vbdBySleeperId: vbd.bySleeperId,
     vbdScale: vbd.scale,
+    tradeSpine,
   };
 }
 
@@ -190,6 +195,7 @@ describe("productionBaseTradePoints elite tail", () => {
     const richAnchors = buildRichStatAnchors(profiles, 1);
     const league: LeagueContext = { ...DEFAULT_STARTING_SLOTS, superflex: false, ppr: 1, leagueSize: 12 };
     const vbd = computeVbdComputation(profiles, 1, league);
+    const tradeSpine = buildTradeSpinePrecompute(profiles, 1, vbd.bySleeperId, richAnchors, anchors);
     const fp = {
       snapshotAsOf: "2099-01-01",
       profiles,
@@ -197,6 +203,7 @@ describe("productionBaseTradePoints elite tail", () => {
       richAnchors,
       vbdBySleeperId: vbd.bySleeperId,
       vbdScale: vbd.scale,
+      tradeSpine,
     };
     const r = productionBaseTradePoints(profiles.neg, "WR", 1, fp);
     expect(Number.isFinite(r.basePoints)).toBe(true);
@@ -224,6 +231,7 @@ describe("productionBaseTradePoints elite tail", () => {
     const richAnchors = buildRichStatAnchors(profiles, 1);
     const league: LeagueContext = { ...DEFAULT_STARTING_SLOTS, superflex: false, ppr: 1, leagueSize: 12 };
     const vbd = computeVbdComputation(profiles, 1, league);
+    const tradeSpine = buildTradeSpinePrecompute(profiles, 1, vbd.bySleeperId, richAnchors, anchors);
     const fp = {
       snapshotAsOf: "2099-01-01",
       profiles,
@@ -231,6 +239,7 @@ describe("productionBaseTradePoints elite tail", () => {
       richAnchors,
       vbdBySleeperId: vbd.bySleeperId,
       vbdScale: vbd.scale,
+      tradeSpine,
     };
     const a = productionBaseTradePoints(profiles.eliteA, "WR", 1, fp);
     const b = productionBaseTradePoints(profiles.eliteB, "WR", 1, fp);
