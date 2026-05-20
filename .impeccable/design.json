@@ -1,0 +1,190 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-05-20T00:00:00.000Z",
+  "title": "Design System: Fantasy Kingdom",
+  "extensions": {
+    "colorMeta": {
+      "primary": {
+        "role": "primary",
+        "displayName": "Workbench Blue",
+        "canonical": "oklch(48% 0.14 250)",
+        "tonalRamp": [
+          "oklch(18% 0.06 250)",
+          "oklch(28% 0.09 250)",
+          "oklch(38% 0.11 250)",
+          "oklch(48% 0.14 250)",
+          "oklch(58% 0.13 250)",
+          "oklch(68% 0.11 250)",
+          "oklch(78% 0.08 250)",
+          "oklch(92% 0.03 250)"
+        ]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Obsidian Surface",
+        "canonical": "oklch(14% 0.01 250)",
+        "tonalRamp": [
+          "oklch(8% 0.01 250)",
+          "oklch(12% 0.01 250)",
+          "oklch(14% 0.01 250)",
+          "oklch(18% 0.01 250)",
+          "oklch(24% 0.01 250)",
+          "oklch(32% 0.01 250)",
+          "oklch(45% 0.01 250)",
+          "oklch(92% 0.005 250)"
+        ]
+      },
+      "text": {
+        "role": "neutral",
+        "displayName": "Soft Snow Text",
+        "canonical": "oklch(98% 0.005 250)",
+        "tonalRamp": [
+          "oklch(20% 0.01 250)",
+          "oklch(35% 0.01 250)",
+          "oklch(50% 0.01 250)",
+          "oklch(65% 0.005 250)",
+          "oklch(75% 0.005 250)",
+          "oklch(85% 0.005 250)",
+          "oklch(92% 0.005 250)",
+          "oklch(98% 0.005 250)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Page title",
+        "purpose": "Tool h1 via .dash-heading-page on trade and rankings."
+      },
+      "headline": {
+        "displayName": "Section title",
+        "purpose": "h2 sections and modal titles via .dash-heading-section."
+      },
+      "title": {
+        "displayName": "Subsection",
+        "purpose": "Team columns and sidebar promos via .dash-heading-subsection."
+      }
+    },
+    "shadows": [
+      {
+        "name": "panel-lift",
+        "value": "0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 8px 32px rgba(0, 0, 0, 0.35)",
+        "purpose": "Default .dash-glass-panel elevation."
+      },
+      {
+        "name": "modal-shell",
+        "value": "0 25px 50px -12px rgba(0, 0, 0, 0.5)",
+        "purpose": "Trade evaluation dialog container."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-press",
+        "value": "cubic-bezier(0.25, 1, 0.5, 1)",
+        "purpose": "150ms press and color transitions on primary controls."
+      },
+      {
+        "name": "team-flash",
+        "value": "dash-team-flash 0.55s ease-out 1",
+        "purpose": "One-shot panel highlight after add-to-team when motion allowed."
+      }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "lg", "value": "1024px" },
+      { "name": "2xl", "value": "1536px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Main CTA on home and trade paths.",
+      "html": "<button type=\"button\" class=\"ds-btn-primary\">Open trade calculator</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 12px 20px; border: none; border-radius: 8px; background: #0c5cab; color: #fafafa; font-family: \"IBM Plex Sans\", ui-sans-serif, system-ui, sans-serif; font-size: 0.875rem; font-weight: 600; cursor: pointer; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3); transition: background 0.15s cubic-bezier(0.25, 1, 0.5, 1), transform 0.15s cubic-bezier(0.25, 1, 0.5, 1); } .ds-btn-primary:hover { background: rgba(12, 92, 171, 0.9); } .ds-btn-primary:active { transform: scale(0.97); } .ds-btn-primary:focus-visible { outline: 2px solid #0c5cab; outline-offset: 2px; }"
+    },
+    {
+      "name": "Glass Panel",
+      "kind": "card",
+      "refersTo": "button-primary",
+      "description": "Grouped tool surface; use one strong rim per node.",
+      "html": "<section class=\"ds-glass-panel\"><h3 class=\"ds-panel-title\">Team 1</h3><p class=\"ds-panel-body\">Add players or picks from search below.</p></section>",
+      "css": ".ds-glass-panel { background: rgba(255, 255, 255, 0.06); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.45); border-radius: 12px; padding: 24px; box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 8px 32px rgba(0, 0, 0, 0.35); color: #fafafa; font-family: \"IBM Plex Sans\", ui-sans-serif, system-ui, sans-serif; } .ds-panel-title { margin: 0 0 8px; font-size: 1.125rem; font-weight: 600; letter-spacing: -0.025em; } .ds-panel-body { margin: 0; font-size: 0.875rem; line-height: 1.5; color: rgba(250, 250, 250, 0.75); }"
+    },
+    {
+      "name": "Nav Link",
+      "kind": "nav",
+      "refersTo": "link-nav",
+      "description": "Header navigation item.",
+      "html": "<a href=\"#\" class=\"ds-nav-link\">Rankings</a>",
+      "css": ".ds-nav-link { display: inline-flex; align-items: center; min-height: 44px; padding: 0 4px; font-family: \"IBM Plex Sans\", ui-sans-serif, system-ui, sans-serif; font-size: 0.875rem; font-weight: 500; color: rgba(250, 250, 250, 0.9); text-decoration: none; border-radius: 8px; transition: color 0.15s cubic-bezier(0.25, 1, 0.5, 1); } .ds-nav-link:hover { color: #0c5cab; } .ds-nav-link:focus-visible { outline: 2px solid #0c5cab; outline-offset: 2px; }"
+    },
+    {
+      "name": "Selected Tab",
+      "kind": "chip",
+      "refersTo": "tab-selected",
+      "description": "Active catalog or rankings tab.",
+      "html": "<button type=\"button\" class=\"ds-tab\" aria-selected=\"true\">RB</button>",
+      "css": ".ds-tab { min-height: 44px; padding: 8px 12px; border: none; border-radius: 8px; background: #0c5cab; color: #fafafa; font-family: \"IBM Plex Sans\", ui-sans-serif, system-ui, sans-serif; font-size: 0.875rem; font-weight: 500; cursor: pointer; transition: background 0.15s cubic-bezier(0.25, 1, 0.5, 1); } .ds-tab:hover { background: #0a4a8a; } .ds-tab:focus-visible { outline: 2px solid #0c5cab; outline-offset: 2px; }"
+    },
+    {
+      "name": "Trade Select",
+      "kind": "input",
+      "refersTo": "button-primary",
+      "description": "Native select with soft rim inside glass panels.",
+      "html": "<select class=\"ds-trade-select\" aria-label=\"League format\"><option>PPR</option><option>Half PPR</option></select>",
+      "css": ".ds-trade-select { min-height: 44px; width: 100%; max-width: 12rem; padding: 8px 2.25rem 8px 0.75rem; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.15); background-color: rgba(0, 0, 0, 0.35); color: #fafafa; font-family: \"IBM Plex Sans\", ui-sans-serif, system-ui, sans-serif; font-size: 0.875rem; cursor: pointer; appearance: none; background-image: url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23fafafa' stroke-opacity='0.72' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E\"); background-repeat: no-repeat; background-position: right 0.75rem center; } .ds-trade-select:focus-visible { outline: 2px solid #0c5cab; outline-offset: 2px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Trusted Trade Desk",
+    "overview": "Fantasy Kingdom looks like a focused dynasty workstation, not a marketing site or sportsbook. Surfaces are dark, data-dense where tools demand it, and editorial where orientation matters. Hierarchy comes from IBM Plex Sans scale and weight before decoration.",
+    "keyCharacteristics": [
+      "Dark cloud-platform base with cool blue primary",
+      "Restrained accent usage",
+      "Fixed rem heading utilities on tool surfaces",
+      "Tonal depth before glass and shadow",
+      "Keyboard-first focus and reduced-motion support"
+    ],
+    "rules": [
+      {
+        "name": "The One Accent Rule",
+        "body": "Primary blue appears on CTAs, selected tabs, focus, and intentional links only.",
+        "section": "colors"
+      },
+      {
+        "name": "The Contrast Stretch Rule",
+        "body": "Aim for 7:1 on essential text and controls; plan high-contrast toggle.",
+        "section": "colors"
+      },
+      {
+        "name": "The Heading Utility Rule",
+        "body": "Use .dash-heading-page, .dash-heading-section, .dash-heading-subsection on tool surfaces.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat Control Rule",
+        "body": "Inner controls use border-white/10-15; glass panels keep border-dash-border.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Motion Feedback Rule",
+        "body": "150ms ease-out for state; no layout animation or decorative loops.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do use semantic dash-* tokens from globals.css.",
+      "Do pair strong glass rims with softer inner control borders.",
+      "Do honor prefers-reduced-motion and aria-live on trade adds.",
+      "Do target AAA contrast on primary text where feasible."
+    ],
+    "donts": [
+      "Don't use equal icon-card grids or hero metric templates.",
+      "Don't stack decorative glass panels as the default layout.",
+      "Don't use colored side-stripe borders on list items.",
+      "Don't use gradient text or neon sportsbook chrome.",
+      "Don't imply official Sleeper or market prices in visual emphasis."
+    ]
+  }
+}
