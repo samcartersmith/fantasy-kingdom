@@ -10,7 +10,7 @@ export default function TradePage() {
         </h1>
       </header>
       <TradeCalculator />
-      <footer className="max-w-3xl space-y-3 pt-2">
+      <footer id="methodology" className="max-w-3xl space-y-3 pt-2 scroll-mt-24">
         <p className="text-sm sm:text-base text-dash-text/70 leading-relaxed">
           Player trade points are led by recent fantasy scoring (an nflverse-backed stat snapshot; run{" "}
           <code className="text-[11px] bg-black/30 px-1 rounded">npm run data:fantasy</code> to refresh), with smaller
