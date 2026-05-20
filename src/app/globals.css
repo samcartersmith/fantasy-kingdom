@@ -64,6 +64,39 @@ body {
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 8px 32px rgba(0, 0, 0, 0.35);
 }
 
+/** Leagues tool: dash focus + connect bar segment alignment */
+.leagues-hub :focus-visible {
+  outline-color: var(--dash-primary);
+}
+
+.leagues-connect-field {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.25rem;
+  min-height: 4.75rem;
+  padding: 0.75rem 1rem;
+  overflow: visible;
+}
+
+.leagues-connect-row input:focus-visible {
+  outline: 2px solid var(--dash-primary);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Keep browser autofill on dark connect inputs (no white flash) */
+.leagues-connect-row input:-webkit-autofill,
+.leagues-connect-row input:-webkit-autofill:hover,
+.leagues-connect-row input:-webkit-autofill:focus,
+.leagues-connect-row input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px var(--dash-surface-elevated) inset !important;
+  box-shadow: 0 0 0 1000px var(--dash-surface-elevated) inset !important;
+  -webkit-text-fill-color: var(--dash-text) !important;
+  caret-color: var(--dash-text);
+  transition: background-color 99999s ease-out;
+}
+
 /** Tool page primary title (h1) — use with text-dash-text */
 .dash-heading-page {
   font-size: var(--dash-type-page-title-size);
