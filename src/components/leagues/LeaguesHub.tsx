@@ -3,7 +3,10 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ConnectBarSelect } from "@/components/leagues/ConnectBarSelect";
+import { SleeperUsernameHelpModal } from "@/components/leagues/SleeperUsernameHelpModal";
+import { TradeSuggestionsModal } from "@/components/trade/TradeSuggestionsModal";
 import type { GuidanceInsight, RosterPlayerRow, RosterSlot } from "@/lib/roster-guidance";
+import type { TradeSuggestion } from "@/lib/trade-suggestions";
 
 type SleeperUserDto = { user_id: string; username: string; display_name: string };
 type LeagueOption = { league_id: string; name: string; season: string; status: string; total_rosters: number };
@@ -96,7 +99,6 @@ function groupPlayersBySlot(players: RosterPlayerRow[]) {
 
 export function LeaguesHub() {
   const [username, setUsername] = useState("");
-  const [leagueIdDirect, setLeagueIdDirect] = useState("");
   const [user, setUser] = useState<SleeperUserDto | null>(null);
   const [leagues, setLeagues] = useState<LeagueOption[] | null>(null);
   const [selectedLeagueId, setSelectedLeagueId] = useState("");
@@ -107,8 +109,27 @@ export function LeaguesHub() {
   const [loading, setLoading] = useState(false);
   const [connectionOpen, setConnectionOpen] = useState(true);
   const [teamPickerOpen, setTeamPickerOpen] = useState(false);
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
+  const [suggestions, setSuggestions] = useState<TradeSuggestion[]>([]);
+  const [prefetchStatus, setPrefetchStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
+  const [remainingStatus, setRemainingStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
+  const [suggestionsError, setSuggestionsError] = useState<string | null>(null);
+  const [suggestionsValueNote, setSuggestionsValueNote] = useState<string | undefined>();
+  const [usernameHelpOpen, setUsernameHelpOpen] = useState(false);
 
   const connectionRef = useRef<HTMLElement>(null);
+  const suggestionsPanelRef = useRef<HTMLDivElement>(null);
+  const usernameHelpPanelRef = useRef<HTMLDivElement>(null);
+  const remainingFetchStarted = useRef(false);
+
+  const resetSuggestionState = useCallback(() => {
+    setSuggestions([]);
+    setPrefetchStatus("idle");
+    setRemainingStatus("idle");
+    setSuggestionsError(null);
+    setSuggestionsValueNote(undefined);
+    remainingFetchStarted.current = false;
+  }, []);
 
   const resetBelowUser = useCallback(() => {
     setLeagues(null);
@@ -116,9 +137,10 @@ export function LeaguesHub() {
     setTeams(null);
     setSelectedRosterId("");
     setResult(null);
+    resetSuggestionState();
     setConnectionOpen(true);
     setTeamPickerOpen(false);
-  }, []);
+  }, [resetSuggestionState]);
 
   useEffect(() => {
     if (result) {
@@ -178,34 +200,39 @@ export function LeaguesHub() {
     (id: string) => {
       setSelectedLeagueId(id);
       setResult(null);
+      resetSuggestionState();
       if (id) void loadTeamsForLeague(id);
     },
-    [loadTeamsForLeague],
+    [loadTeamsForLeague, resetSuggestionState],
   );
 
-  const connectByLeagueId = useCallback(async () => {
-    const id = leagueIdDirect.trim();
-    if (!id) return;
-    setLoading(true);
-    setError(null);
-    setUser(null);
-    setLeagues(null);
-    setSelectedLeagueId(id);
-    setResult(null);
-    try {
-      await loadTeamsForLeague(id);
-    } catch {
-      /* loadTeamsForLeague sets error */
-    } finally {
-      setLoading(false);
-    }
-  }, [leagueIdDirect, loadTeamsForLeague]);
+  const fetchSuggestions = useCallback(
+    async (opts: { limit: number; offset: number; exclude?: string[] }) => {
+      if (!selectedLeagueId || !selectedRosterId) return [];
+      const params = new URLSearchParams({
+        league_id: selectedLeagueId,
+        roster_id: selectedRosterId,
+        limit: String(opts.limit),
+        offset: String(opts.offset),
+      });
+      if (opts.exclude?.length) {
+        params.set("exclude", opts.exclude.join(","));
+      }
+      const res = await fetch(`/api/sleeper/trade-suggestions?${params}`);
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+      if (body.meta?.valueNote) setSuggestionsValueNote(body.meta.valueNote);
+      return (body.suggestions ?? []) as TradeSuggestion[];
+    },
+    [selectedLeagueId, selectedRosterId],
+  );
 
   const analyzeRoster = useCallback(async () => {
     if (!selectedLeagueId || !selectedRosterId) return;
     setLoading(true);
     setError(null);
     setResult(null);
+    resetSuggestionState();
     try {
       const res = await fetch(
         `/api/sleeper/roster-guidance?league_id=${encodeURIComponent(selectedLeagueId)}&roster_id=${encodeURIComponent(selectedRosterId)}`,
@@ -218,7 +245,101 @@ export function LeaguesHub() {
     } finally {
       setLoading(false);
     }
-  }, [selectedLeagueId, selectedRosterId]);
+  }, [selectedLeagueId, selectedRosterId, resetSuggestionState]);
+
+  useEffect(() => {
+    if (!result || !selectedLeagueId || !selectedRosterId) return;
+    let cancelled = false;
+    setPrefetchStatus("loading");
+    setSuggestionsError(null);
+    void (async () => {
+      try {
+        const first = await fetchSuggestions({ limit: 1, offset: 0 });
+        if (cancelled) return;
+        setSuggestions(first);
+        setPrefetchStatus("done");
+      } catch (e) {
+        if (cancelled) return;
+        setPrefetchStatus("error");
+        setSuggestionsError(e instanceof Error ? e.message : "Could not load trade suggestions");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [result, selectedLeagueId, selectedRosterId, fetchSuggestions]);
+
+  const fetchRemainingSuggestions = useCallback(async () => {
+    if (remainingFetchStarted.current) return;
+    remainingFetchStarted.current = true;
+    setRemainingStatus("loading");
+    try {
+      const exclude = suggestions.map((s) => s.id);
+      const more = await fetchSuggestions({
+        limit: 2,
+        offset: 0,
+        exclude: exclude.length ? exclude : undefined,
+      });
+      setSuggestions((prev) => {
+        const byId = new Map(prev.map((s) => [s.id, s]));
+        for (const s of more) byId.set(s.id, s);
+        return [...byId.values()].sort((a, b) => a.rank - b.rank);
+      });
+      setRemainingStatus("done");
+    } catch (e) {
+      setRemainingStatus("error");
+      setSuggestionsError(e instanceof Error ? e.message : "Could not load more suggestions");
+    }
+  }, [fetchSuggestions, suggestions]);
+
+  const openTradeSuggestions = useCallback(() => {
+    setSuggestionsOpen(true);
+    if (suggestions.length < 3 && prefetchStatus !== "loading") {
+      void fetchRemainingSuggestions();
+    }
+  }, [suggestions.length, prefetchStatus, fetchRemainingSuggestions]);
+
+  useEffect(() => {
+    if (!suggestionsOpen) return;
+    if (prefetchStatus === "loading") return;
+    if (suggestions.length >= 3) return;
+    if (remainingStatus !== "idle") return;
+    void fetchRemainingSuggestions();
+  }, [suggestionsOpen, prefetchStatus, suggestions.length, remainingStatus, fetchRemainingSuggestions]);
+
+  useEffect(() => {
+    if (!suggestionsOpen && !usernameHelpOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        if (usernameHelpOpen) setUsernameHelpOpen(false);
+        else if (suggestionsOpen) setSuggestionsOpen(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [suggestionsOpen, usernameHelpOpen]);
+
+  useEffect(() => {
+    if (!usernameHelpOpen) return;
+    requestAnimationFrame(() => {
+      const panel = usernameHelpPanelRef.current;
+      const focusable = panel?.querySelector<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      );
+      focusable?.focus();
+    });
+  }, [usernameHelpOpen]);
+
+  useEffect(() => {
+    if (!suggestionsOpen) return;
+    requestAnimationFrame(() => {
+      const panel = suggestionsPanelRef.current;
+      const focusable = panel?.querySelector<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      );
+      focusable?.focus();
+    });
+  }, [suggestionsOpen]);
 
   const openConnection = useCallback(() => {
     setConnectionOpen(true);
@@ -241,21 +362,16 @@ export function LeaguesHub() {
   const showConnectFlow = !result || connectionOpen;
   const hasLeagueList = Boolean(leagues && leagues.length > 0);
   const hasTeamList = Boolean(teams && teams.length > 0);
-  const connectedViaLeagueId = Boolean(selectedLeagueId && !user && !hasLeagueList);
-  const leagueLocked = connectedViaLeagueId || Boolean(selectedLeagueId && !hasLeagueList && hasTeamList);
   const readyToAnalyze = Boolean(selectedLeagueId && selectedRosterId && hasTeamList);
-  const primaryBarAction: "find" | "analyze" = user || connectedViaLeagueId ? "analyze" : "find";
+  const primaryBarAction: "find" | "analyze" = user ? "analyze" : "find";
 
   const leagueSelectOptions = useMemo(() => {
-    if (leagueLocked && selectedLeagueId) {
-      return [{ value: selectedLeagueId, label: `League ID · ${selectedLeagueId.slice(0, 12)}…` }];
-    }
     if (!leagues?.length) return [];
     return leagues.map((l) => ({
       value: l.league_id,
       label: `${l.name} (${l.season})`,
     }));
-  }, [leagueLocked, leagues, selectedLeagueId]);
+  }, [leagues]);
 
   const teamSelectOptions = useMemo(() => {
     if (!teams?.length) return [];
@@ -265,17 +381,13 @@ export function LeaguesHub() {
     }));
   }, [teams]);
 
-  const leaguePlaceholder = connectedViaLeagueId
-    ? loading && !teams
-      ? "Loading league…"
-      : "League ID"
-    : !user
-      ? "Find leagues first"
-      : loading && !leagues
-        ? "Loading leagues…"
-        : leagues && leagues.length === 0
-          ? "No leagues found"
-          : "Select league";
+  const leaguePlaceholder = !user
+    ? "Find leagues first"
+    : loading && !leagues
+      ? "Loading leagues…"
+      : leagues && leagues.length === 0
+        ? "No leagues found"
+        : "Select league";
 
   const teamPlaceholder = !selectedLeagueId
     ? "Select league first"
@@ -285,8 +397,7 @@ export function LeaguesHub() {
         ? "No teams found"
         : "Select team";
 
-  const leagueSelectDisabled =
-    leagueLocked || !user || !hasLeagueList || (loading && !leagues && !connectedViaLeagueId);
+  const leagueSelectDisabled = !user || !hasLeagueList || (loading && !leagues);
   const teamSelectDisabled = !selectedLeagueId || !hasTeamList || (loading && !teams);
 
   return (
@@ -376,39 +487,15 @@ export function LeaguesHub() {
             </p>
           ) : null}
 
-          <details className="text-sm text-dash-text/75">
-            <summary className="cursor-pointer min-h-11 inline-flex items-center text-dash-text/80 hover:text-dash-primary motion-safe:transition-colors motion-safe:duration-150">
-              Or paste a league ID
-            </summary>
-            <div className={`mt-3 ${connectRow}`} aria-busy={loading}>
-              <div className={`${connectFieldShell} flex-1 min-w-[14rem]`}>
-                <label htmlFor="league-id-direct" className={connectBarLabel}>
-                  League ID
-                </label>
-                <input
-                  id="league-id-direct"
-                  className={connectBarControl}
-                  value={leagueIdDirect}
-                  onChange={(e) => setLeagueIdDirect(e.target.value)}
-                  placeholder="Sleeper league ID"
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && leagueIdDirect.trim() && !loading) void connectByLeagueId();
-                  }}
-                />
-              </div>
-              <div className="flex items-center justify-center shrink-0">
-                <button
-                  type="button"
-                  className={btnBarAction}
-                  disabled={loading || !leagueIdDirect.trim()}
-                  aria-label="Load league"
-                  onClick={() => void connectByLeagueId()}
-                >
-                  <BarSearchIcon />
-                </button>
-              </div>
-            </div>
-          </details>
+          <p className="text-sm text-dash-text/75">
+            <button
+              type="button"
+              className={`${linkAction} font-semibold`}
+              onClick={() => setUsernameHelpOpen(true)}
+            >
+              How do I find my Sleeper username?
+            </button>
+          </p>
         </section>
       ) : null}
 
@@ -600,17 +687,36 @@ export function LeaguesHub() {
                     ))}
                   </ul>
                 )}
-                <Link
-                  href="/trade"
-                  className={`${btnPress} block text-center min-h-11 leading-[2.75rem] text-sm font-semibold rounded-[var(--dash-radius-sm)] border border-dash-primary/45 text-dash-text bg-dash-primary/15 hover:bg-dash-primary/30 hover:border-dash-primary/70`}
+                <button
+                  type="button"
+                  onClick={openTradeSuggestions}
+                  className={`${btnPress} block w-full text-center min-h-11 leading-[2.75rem] text-sm font-semibold rounded-[var(--dash-radius-sm)] border border-dash-primary/45 text-dash-text bg-dash-primary/15 hover:bg-dash-primary/30 hover:border-dash-primary/70`}
                 >
-                  Open trade calculator
-                </Link>
+                  {prefetchStatus === "loading" ? "Trade suggestions…" : "Trade suggestions"}
+                </button>
               </div>
             </aside>
           </div>
+
+          <TradeSuggestionsModal
+            open={suggestionsOpen}
+            onClose={() => setSuggestionsOpen(false)}
+            panelRef={suggestionsPanelRef}
+            team1Name={result.team.name}
+            suggestions={suggestions}
+            prefetchLoading={prefetchStatus === "loading"}
+            remainingLoading={remainingStatus === "loading"}
+            error={suggestionsError}
+            valueNote={suggestionsValueNote}
+          />
         </>
       ) : null}
+
+      <SleeperUsernameHelpModal
+        open={usernameHelpOpen}
+        onClose={() => setUsernameHelpOpen(false)}
+        panelRef={usernameHelpPanelRef}
+      />
     </div>
   );
 }
