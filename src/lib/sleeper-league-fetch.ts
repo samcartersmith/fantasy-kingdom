@@ -3,6 +3,7 @@ import type {
   SleeperLeague,
   SleeperLeagueUser,
   SleeperRoster,
+  SleeperTradedPick,
   SleeperUser,
 } from "@/lib/sleeper-league-types";
 
@@ -65,6 +66,14 @@ export async function fetchSleeperLeagueRosters(leagueId: string): Promise<Sleep
 export async function fetchSleeperLeagueUsers(leagueId: string): Promise<SleeperLeagueUser[]> {
   const result = await sleeperGet<SleeperLeagueUser[]>(
     `${SLEEPER_API_V1_BASE}/league/${encodeURIComponent(leagueId)}/users`,
+  );
+  if (!result.ok || !Array.isArray(result.data)) return [];
+  return result.data;
+}
+
+export async function fetchSleeperLeagueTradedPicks(leagueId: string): Promise<SleeperTradedPick[]> {
+  const result = await sleeperGet<SleeperTradedPick[]>(
+    `${SLEEPER_API_V1_BASE}/league/${encodeURIComponent(leagueId)}/traded_picks`,
   );
   if (!result.ok || !Array.isArray(result.data)) return [];
   return result.data;

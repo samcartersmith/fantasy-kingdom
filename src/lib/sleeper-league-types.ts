@@ -36,3 +36,12 @@ export type SleeperLeagueUser = {
   display_name: string;
   metadata?: { team_name?: string };
 };
+
+/** League traded / future draft picks (`GET /league/{id}/traded_picks`). */
+export type SleeperTradedPick = {
+  season: string;
+  round: number;
+  roster_id: number;
+  previous_owner_id: number;
+  owner_id: number;
+};

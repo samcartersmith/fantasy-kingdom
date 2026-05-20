@@ -120,7 +120,7 @@ export function ConnectBarSelect({
           width: menuPos.width,
           zIndex: 100,
         }}
-        className="max-h-60 overflow-y-auto overscroll-contain rounded-[var(--dash-radius-sm)] border border-dash-border bg-dash-surface-elevated py-1 shadow-[0_8px_32px_rgba(0,0,0,0.45)]"
+        className="max-h-60 overflow-y-auto overscroll-contain rounded-[var(--dash-radius-sm)] border border-dash-border bg-dash-surface-elevated py-2 shadow-[0_8px_32px_rgba(0,0,0,0.45)]"
       >
         {options.map((opt) => {
           const isSelected = opt.value === value;
@@ -130,7 +130,7 @@ export function ConnectBarSelect({
                 type="button"
                 role="option"
                 aria-selected={isSelected}
-                className={`w-full px-3 py-2.5 text-left text-sm cursor-pointer motion-safe:transition-colors motion-safe:duration-150 focus-visible:outline-none focus-visible:bg-dash-primary/25 ${
+                className={`w-full px-4 py-3 text-left text-sm cursor-pointer motion-safe:transition-colors motion-safe:duration-150 focus-visible:outline-none focus-visible:bg-dash-primary/25 ${
                   isSelected
                     ? "bg-dash-primary/20 text-dash-text font-medium"
                     : "text-dash-text/90 hover:bg-white/8 hover:text-dash-text"
@@ -155,7 +155,7 @@ export function ConnectBarSelect({
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={listboxId}
-        className={`${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"} w-full min-h-9 flex items-center justify-between gap-2 rounded-[2px] text-left text-sm motion-safe:transition-colors motion-safe:duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dash-primary focus-visible:ring-offset-1 focus-visible:ring-offset-transparent hover:text-dash-text`}
+        className={`${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"} w-full min-h-10 flex items-center justify-between gap-2 rounded-[2px] px-0.5 text-left text-sm motion-safe:transition-colors motion-safe:duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dash-primary focus-visible:ring-offset-1 focus-visible:ring-offset-transparent hover:text-dash-text`}
         onClick={() => {
           if (!disabled) setOpen((v) => !v);
         }}

@@ -32,13 +32,26 @@ export type RosterGuidancePayload = {
   insights: GuidanceInsight[];
 };
 
-type Skill = "QB" | "RB" | "WR" | "TE";
+export type Skill = "QB" | "RB" | "WR" | "TE";
 
-const SKILLS: Skill[] = ["QB", "RB", "WR", "TE"];
+export const ROSTER_SKILLS: Skill[] = ["QB", "RB", "WR", "TE"];
 
-function skillFromPosition(position: string | null): Skill | null {
+export type StartSlots = { qb: number; rb: number; wr: number; te: number };
+
+export type RosterProfile = {
+  rosterId: number;
+  teamName: string;
+  players: RosterPlayerRow[];
+  roomScores: Record<Skill, number>;
+  weakSkills: Skill[];
+  strongSkills: Skill[];
+  surplusPlayers: RosterPlayerRow[];
+  totalValue: number;
+};
+
+export function skillFromPosition(position: string | null): Skill | null {
   if (!position) return null;
-  for (const s of SKILLS) {
+  for (const s of ROSTER_SKILLS) {
     if (catalogPlayerHasSkillPosition(position, s)) return s;
   }
   return null;
@@ -88,8 +101,6 @@ function sumTop(values: number[], n: number): number {
     .reduce((a, b) => a + b, 0);
 }
 
-type StartSlots = { qb: number; rb: number; wr: number; te: number };
-
 const START_SLOT_BY_SKILL: Record<Skill, keyof StartSlots> = {
   QB: "qb",
   RB: "rb",
@@ -97,17 +108,108 @@ const START_SLOT_BY_SKILL: Record<Skill, keyof StartSlots> = {
   TE: "te",
 };
 
-function slotsForSkill(skill: Skill, startSlots: StartSlots): number {
+export function slotsForSkill(skill: Skill, startSlots: StartSlots): number {
   return startSlots[START_SLOT_BY_SKILL[skill]];
 }
 
-function positionRoomStrength(players: RosterPlayerRow[], skill: Skill, startSlots: StartSlots): number {
+export function positionRoomStrength(
+  players: RosterPlayerRow[],
+  skill: Skill,
+  startSlots: StartSlots,
+): number {
   const pool = players.filter((p) => skillFromPosition(p.position) === skill);
   if (pool.length === 0) return 0;
   return sumTop(
     pool.map((p) => p.value),
     Math.max(1, slotsForSkill(skill, startSlots)),
   );
+}
+
+export function buildRoomScores(
+  players: RosterPlayerRow[],
+  startSlots: StartSlots,
+): Record<Skill, number> {
+  const scores = {} as Record<Skill, number>;
+  for (const skill of ROSTER_SKILLS) {
+    scores[skill] = positionRoomStrength(players, skill, startSlots);
+  }
+  return scores;
+}
+
+/** Bench depth at non-weak skills suitable for trade packages (no 0.85 starter cutoff). */
+export function getDepthSurplusPlayers(
+  players: RosterPlayerRow[],
+  startSlots: StartSlots,
+  excludeSkills: Skill[] = [],
+): RosterPlayerRow[] {
+  const exclude = new Set(excludeSkills);
+  return players
+    .filter((p) => p.slot !== "starter")
+    .filter((p) => {
+      const skill = skillFromPosition(p.position);
+      if (!skill || exclude.has(skill)) return false;
+      const atPosition = players.filter((x) => skillFromPosition(x.position) === skill);
+      return atPosition.length > slotsForSkill(skill, startSlots) + 1;
+    })
+    .sort((a, b) => b.value - a.value);
+}
+
+export function getTradeableSurplusPlayers(
+  players: RosterPlayerRow[],
+  startSlots: StartSlots,
+  excludeSkills: Skill[] = [],
+): RosterPlayerRow[] {
+  const exclude = new Set(excludeSkills);
+  const bench = players.filter((p) => p.slot !== "starter");
+  return bench
+    .filter((p) => {
+      const skill = skillFromPosition(p.position);
+      if (!skill || exclude.has(skill)) return false;
+      const atPosition = players.filter((x) => skillFromPosition(x.position) === skill);
+      const slots = slotsForSkill(skill, startSlots);
+      const starterCutoff = sumTop(
+        atPosition.map((x) => x.value),
+        slots,
+      );
+      return p.value >= starterCutoff * 0.85 && atPosition.length > slots + 1;
+    })
+    .sort((a, b) => b.value - a.value);
+}
+
+function rankSkillsByRoom(roomScores: Record<Skill, number>): { weak: Skill[]; strong: Skill[] } {
+  const ranked = ROSTER_SKILLS.map((skill) => ({ skill, score: roomScores[skill] }))
+    .filter((r) => r.score > 0)
+    .sort((a, b) => a.score - b.score);
+  if (ranked.length === 0) {
+    return { weak: [], strong: [] };
+  }
+  const minScore = ranked[0]!.score;
+  const maxScore = ranked[ranked.length - 1]!.score;
+  const weak = ranked.filter((r) => r.score === minScore).map((r) => r.skill);
+  const strong = ranked.filter((r) => r.score === maxScore).map((r) => r.skill);
+  return { weak, strong };
+}
+
+export function buildRosterProfile(
+  roster: SleeperRoster,
+  catalogById: Map<string, CatalogAsset>,
+  startSlots: StartSlots,
+  teamName: string,
+): RosterProfile {
+  const players = buildRosterPlayerRows(roster, catalogById);
+  const roomScores = buildRoomScores(players, startSlots);
+  const { weak, strong } = rankSkillsByRoom(roomScores);
+  const surplusPlayers = getTradeableSurplusPlayers(players, startSlots, weak);
+  return {
+    rosterId: roster.roster_id,
+    teamName,
+    players,
+    roomScores,
+    weakSkills: weak,
+    strongSkills: strong,
+    surplusPlayers,
+    totalValue: players.reduce((a, p) => a + p.value, 0),
+  };
 }
 
 export function sumRosterValue(
@@ -147,7 +249,7 @@ export function buildRosterGuidance(
     body: `Your modeled roster total is ${totalValue.toLocaleString()} (${leagueContextLabel}), rank ${rank.rank} of ${rank.total} teams in this league.`,
   });
 
-  const roomScores = SKILLS.map((skill) => ({
+  const roomScores = ROSTER_SKILLS.map((skill) => ({
     skill,
     score: positionRoomStrength(players, skill, startSlots),
   })).filter((r) => r.score > 0);
@@ -166,20 +268,7 @@ export function buildRosterGuidance(
     }
   }
 
-  const bench = players.filter((p) => p.slot !== "starter");
-  const tradeCandidates = bench
-    .filter((p) => {
-      const skill = skillFromPosition(p.position);
-      if (!skill) return false;
-      const atPosition = players.filter((x) => skillFromPosition(x.position) === skill);
-      const slots = slotsForSkill(skill, startSlots);
-      const starterCutoff = sumTop(
-        atPosition.map((x) => x.value),
-        slots,
-      );
-      return p.value >= starterCutoff * 0.85 && atPosition.length > slots + 1;
-    })
-    .sort((a, b) => b.value - a.value);
+  const tradeCandidates = getTradeableSurplusPlayers(players, startSlots);
 
   if (tradeCandidates[0]) {
     const c = tradeCandidates[0];
