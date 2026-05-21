@@ -1,20 +1,25 @@
 "use client";
 
-import { useEffect, useId, useRef } from "react";
+import { useEffect, useId, useMemo, useRef } from "react";
 import { WizardOptionList, type WizardOption } from "@/components/leagues/WizardOptionList";
+import type { SleeperConnectMode } from "@/hooks/useSleeperConnect";
 
 export type WizardStep = 1 | 2 | 3;
 
-const STEPS: { step: WizardStep; label: string }[] = [
+const FULL_STEPS: { step: WizardStep; label: string }[] = [
   { step: 1, label: "Username" },
   { step: 2, label: "League" },
   { step: 3, label: "Team" },
 ];
 
-const STEP_COPY: Record<
-  WizardStep,
-  { title: string; helper: string; primaryLabel: string; loadingHint?: string }
-> = {
+const LEAGUE_ONLY_STEPS: { step: WizardStep; label: string }[] = [
+  { step: 1, label: "Username" },
+  { step: 2, label: "League" },
+];
+
+type StepCopy = { title: string; helper: string; primaryLabel: string; loadingHint?: string };
+
+const FULL_STEP_COPY: Record<WizardStep, StepCopy> = {
   1: {
     title: "Connect Sleeper",
     helper: "Enter your Sleeper handle to load dynasty leagues.",
@@ -34,6 +39,31 @@ const STEP_COPY: Record<
   },
 };
 
+const LEAGUE_ONLY_STEP_COPY: Record<1 | 2, StepCopy> = {
+  1: {
+    title: "Connect Sleeper",
+    helper: "Enter your Sleeper handle to load dynasty leagues.",
+    primaryLabel: "Find leagues",
+  },
+  2: {
+    title: "Choose a league",
+    helper: "Pick the dynasty league whose history you want to explore.",
+    primaryLabel: "Load league history",
+    loadingHint: "Loading leagues…",
+  },
+};
+
+function leagueOnlyStepCopy(primaryLabel: string): Record<1 | 2, StepCopy> {
+  return {
+    1: LEAGUE_ONLY_STEP_COPY[1],
+    2: {
+      ...LEAGUE_ONLY_STEP_COPY[2],
+      helper: "Pick the dynasty league whose drafts you want to grade.",
+      primaryLabel,
+    },
+  };
+}
+
 const btnPress =
   "cursor-pointer motion-safe:transition motion-safe:duration-150 motion-safe:active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dash-primary focus-visible:ring-offset-2 focus-visible:ring-offset-dash-surface disabled:opacity-50 disabled:pointer-events-none disabled:cursor-not-allowed";
 
@@ -48,6 +78,9 @@ const fieldClass =
   "leagues-connect-row w-full min-h-11 rounded-[var(--dash-radius-sm)] border border-dash-border bg-black/35 px-3 py-2 text-sm text-dash-text placeholder:text-dash-text/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dash-primary focus-visible:ring-offset-2 focus-visible:ring-offset-dash-surface";
 
 type Props = {
+  mode?: SleeperConnectMode;
+  /** Step 2 primary button when `mode="league-only"` (default: Load league history). */
+  leagueOnlyPrimaryLabel?: string;
   step: WizardStep;
   username: string;
   onUsernameChange: (value: string) => void;
@@ -59,6 +92,7 @@ type Props = {
   teamsLoading: boolean;
   loading: boolean;
   canAnalyze: boolean;
+  canProceedFromLeague?: boolean;
   leagueEmptyMessage?: string;
   teamEmptyMessage?: string;
   onConnect: () => void;
@@ -70,6 +104,8 @@ type Props = {
 };
 
 export function SleeperConnectWizard({
+  mode = "full",
+  leagueOnlyPrimaryLabel = "Load league history",
   step,
   username,
   onUsernameChange,
@@ -81,6 +117,7 @@ export function SleeperConnectWizard({
   teamsLoading,
   loading,
   canAnalyze,
+  canProceedFromLeague = false,
   leagueEmptyMessage,
   teamEmptyMessage,
   onConnect,
@@ -92,7 +129,11 @@ export function SleeperConnectWizard({
 }: Props) {
   const titleId = useId();
   const stepBodyRef = useRef<HTMLDivElement>(null);
-  const copy = STEP_COPY[step];
+  const isLeagueOnly = mode === "league-only";
+
+  const steps = isLeagueOnly ? LEAGUE_ONLY_STEPS : FULL_STEPS;
+  const leagueOnlyCopy = leagueOnlyStepCopy(leagueOnlyPrimaryLabel);
+  const copy = isLeagueOnly ? leagueOnlyCopy[step as 1 | 2] : FULL_STEP_COPY[step];
 
   useEffect(() => {
     requestAnimationFrame(() => {
@@ -109,12 +150,21 @@ export function SleeperConnectWizard({
     else onAnalyze();
   };
 
-  const primaryDisabled =
-    loading || (step === 1 && !username.trim()) || (step === 3 && !canAnalyze);
+  const primaryDisabled = useMemo(() => {
+    if (loading) return true;
+    if (step === 1) return !username.trim();
+    if (isLeagueOnly && step === 2) return !canProceedFromLeague;
+    if (step === 3) return !canAnalyze;
+    return false;
+  }, [loading, step, username, isLeagueOnly, canProceedFromLeague, canAnalyze]);
 
   const showBack = step > 1;
-  const showPrimary = step === 1 || step === 3;
+  const showPrimary = step === 1 || (isLeagueOnly ? step === 2 : step === 3);
   const listLoading = step === 2 ? leaguesLoading : step === 3 ? teamsLoading : false;
+
+  if (isLeagueOnly && step === 3) {
+    return null;
+  }
 
   return (
     <section
@@ -123,7 +173,7 @@ export function SleeperConnectWizard({
     >
       <div className="mx-auto w-full max-w-lg sm:max-w-xl space-y-8">
         <nav aria-label="Connect progress" className="flex items-center justify-center gap-2 sm:gap-4">
-          {STEPS.map(({ step: s, label }, i) => {
+          {steps.map(({ step: s, label }, i) => {
             const done = s < step;
             const current = s === step;
             return (
@@ -158,11 +208,7 @@ export function SleeperConnectWizard({
           })}
         </nav>
 
-        <div
-          key={step}
-          ref={stepBodyRef}
-          className="leagues-wizard-step-enter space-y-6"
-        >
+        <div key={step} ref={stepBodyRef} className="leagues-wizard-step-enter space-y-6">
           <header className="space-y-2 text-center sm:text-left">
             <h2 id={titleId} className="dash-heading-section text-dash-text">
               {copy.title}
@@ -214,7 +260,7 @@ export function SleeperConnectWizard({
             />
           ) : null}
 
-          {step === 3 ? (
+          {!isLeagueOnly && step === 3 ? (
             <WizardOptionList
               id="wizard-team"
               label="Team"

@@ -1,7 +1,12 @@
 import { SLEEPER_API_V1_BASE } from "@/lib/sleeper-constants";
 import type {
+  LeagueHistorySeason,
+  SleeperBracketMatch,
+  SleeperDraft,
+  SleeperDraftPick,
   SleeperLeague,
   SleeperLeagueUser,
+  SleeperMatchup,
   SleeperRoster,
   SleeperTradedPick,
   SleeperUser,
@@ -90,4 +95,124 @@ export function isDynastyLeague(league: SleeperLeague): boolean {
 export function currentNflSeasonYears(): string[] {
   const y = new Date().getFullYear();
   return [String(y), String(y - 1)];
+}
+
+export async function fetchSleeperLeagueMatchups(
+  leagueId: string,
+  week: number,
+): Promise<SleeperMatchup[]> {
+  const result = await sleeperGet<SleeperMatchup[]>(
+    `${SLEEPER_API_V1_BASE}/league/${encodeURIComponent(leagueId)}/matchups/${week}`,
+  );
+  if (!result.ok || !Array.isArray(result.data)) return [];
+  return result.data.filter((m) => m?.roster_id != null);
+}
+
+export async function fetchSleeperWinnersBracket(leagueId: string): Promise<SleeperBracketMatch[]> {
+  const result = await sleeperGet<SleeperBracketMatch[]>(
+    `${SLEEPER_API_V1_BASE}/league/${encodeURIComponent(leagueId)}/winners_bracket`,
+  );
+  if (!result.ok || !Array.isArray(result.data)) return [];
+  return result.data;
+}
+
+export async function fetchSleeperLeagueDrafts(leagueId: string): Promise<SleeperDraft[]> {
+  const result = await sleeperGet<SleeperDraft[]>(
+    `${SLEEPER_API_V1_BASE}/league/${encodeURIComponent(leagueId)}/drafts`,
+  );
+  if (!result.ok || !Array.isArray(result.data)) return [];
+  return result.data.filter((d) => d?.draft_id);
+}
+
+export async function fetchSleeperDraftPicks(draftId: string): Promise<SleeperDraftPick[]> {
+  const result = await sleeperGet<SleeperDraftPick[]>(
+    `${SLEEPER_API_V1_BASE}/draft/${encodeURIComponent(draftId)}/picks`,
+  );
+  if (!result.ok || !Array.isArray(result.data)) return [];
+  return result.data;
+}
+
+const MAX_HISTORY_SEASONS = 25;
+
+function isValidPreviousLeagueId(id: unknown): id is string {
+  if (typeof id !== "string") return false;
+  const t = id.trim();
+  return t.length > 0 && t !== "0";
+}
+
+/** Walk `previous_league_id` from the current league back through prior seasons. */
+export async function fetchLeagueHistoryChain(
+  startLeagueId: string,
+  maxSeasons = MAX_HISTORY_SEASONS,
+): Promise<LeagueHistorySeason[]> {
+  const chain: LeagueHistorySeason[] = [];
+  let currentId: string | null = startLeagueId.trim();
+  const seen = new Set<string>();
+
+  while (currentId && chain.length < maxSeasons) {
+    if (seen.has(currentId)) break;
+    seen.add(currentId);
+
+    const league = await fetchSleeperLeague(currentId);
+    if (!league?.league_id) break;
+
+    chain.push({
+      league_id: league.league_id,
+      season: league.season,
+      name: league.name,
+      status: league.status,
+    });
+
+    const prev = league.previous_league_id;
+    currentId = isValidPreviousLeagueId(prev) ? prev.trim() : null;
+  }
+
+  return chain;
+}
+
+const MATCHUP_WEEK_BATCH = 4;
+const MAX_MATCHUP_WEEKS = 18;
+
+/** Fetch regular-season matchups for weeks 1..maxWeek in concurrent batches. */
+export async function fetchSeasonRegularMatchups(
+  leagueId: string,
+  maxWeek: number,
+): Promise<Map<number, SleeperMatchup[]>> {
+  const cap = Math.min(MAX_MATCHUP_WEEKS, Math.max(1, maxWeek));
+  const byWeek = new Map<number, SleeperMatchup[]>();
+
+  for (let start = 1; start <= cap; start += MATCHUP_WEEK_BATCH) {
+    const end = Math.min(cap, start + MATCHUP_WEEK_BATCH - 1);
+    const weeks = Array.from({ length: end - start + 1 }, (_, i) => start + i);
+    const results = await Promise.all(
+      weeks.map(async (w) => ({ week: w, rows: await fetchSleeperLeagueMatchups(leagueId, w) })),
+    );
+    for (const { week, rows } of results) {
+      if (rows.length > 0) byWeek.set(week, rows);
+    }
+  }
+
+  return byWeek;
+}
+
+export function regularSeasonWeekLimit(league: SleeperLeague): number {
+  const playoffStart = league.settings?.playoff_week_start;
+  if (typeof playoffStart === "number" && playoffStart > 1) {
+    return playoffStart - 1;
+  }
+  return 14;
+}
+
+export function rosterDisplayName(
+  rosterId: number,
+  users: SleeperLeagueUser[],
+  rosters: SleeperRoster[],
+): string {
+  const roster = rosters.find((r) => r.roster_id === rosterId);
+  const owner = roster?.owner_id ? users.find((u) => u.user_id === roster.owner_id) : undefined;
+  return (
+    owner?.metadata?.team_name?.trim() ||
+    owner?.display_name?.trim() ||
+    `Roster ${rosterId}`
+  );
 }
