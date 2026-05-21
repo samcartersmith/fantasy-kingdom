@@ -7,8 +7,8 @@ const navItems = [
   { href: "/", label: "Home", match: (p: string) => p === "/" },
   { href: "/trade", label: "Trade calculator", match: (p: string) => p.startsWith("/trade") },
   { href: "/rankings", label: "Rankings", match: (p: string) => p.startsWith("/rankings") },
-  { href: "/leagues", label: "Leagues", match: (p: string) => p.startsWith("/leagues") },
-  { href: "/resources", label: "Resources", match: (p: string) => p.startsWith("/resources") },
+  { href: "/leagues", label: "Team evaluation", match: (p: string) => p.startsWith("/leagues") },
+  { href: "/tools", label: "Tools", match: (p: string) => p.startsWith("/tools") },
 ] as const;
 
 const navLinkBase =
@@ -18,7 +18,8 @@ const navLinkActive = "text-home-accent";
 
 export function SiteHeader() {
   const pathname = usePathname();
-  const useHomeChrome = pathname === "/" || pathname.startsWith("/leagues") || pathname.startsWith("/resources");
+  const useHomeChrome =
+    pathname === "/" || pathname.startsWith("/leagues") || pathname.startsWith("/tools");
 
   return (
     <header
@@ -59,7 +60,11 @@ export function SiteHeader() {
           <nav aria-label="Mobile tools" className="flex md:hidden items-center gap-3">
             {navItems.slice(1, 4).map(({ href, label }) => (
               <Link key={href} href={href} className={`${navLinkBase} text-dash-text/85`}>
-                {label === "Trade calculator" ? "Trade" : label}
+                {label === "Trade calculator"
+                  ? "Trade"
+                  : label === "Team evaluation"
+                    ? "Teams"
+                    : label}
               </Link>
             ))}
           </nav>

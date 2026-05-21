@@ -572,7 +572,7 @@ export function TradeCalculator() {
             </div>
             <ul
               id="trade-catalog-results"
-              className="divide-y divide-white/10 rounded-[var(--dash-radius-sm)] border border-white/10 overflow-hidden max-h-[min(480px,50vh)] overflow-y-scroll [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.35)_rgba(0,0,0,0.25)] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:rounded-b-[calc(var(--dash-radius-sm)-1px)] [&::-webkit-scrollbar-track]:bg-black/30 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/30 hover:[&::-webkit-scrollbar-thumb]:bg-white/45"
+              className="dash-scrollbar divide-y divide-white/10 rounded-[var(--dash-radius-sm)] border border-white/10 overflow-hidden max-h-[min(480px,50vh)] overflow-y-scroll bg-black/25"
               role="list"
             >
               {filtered.map((asset) => (

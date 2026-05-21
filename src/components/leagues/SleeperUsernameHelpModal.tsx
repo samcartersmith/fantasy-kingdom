@@ -65,7 +65,7 @@ export function SleeperUsernameHelpModal({ open, onClose, panelRef }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-50 overflow-y-auto bg-black/55"
+      className="dash-scrollbar fixed inset-0 z-50 overflow-y-auto bg-black/55"
       role="presentation"
       onClick={onClose}
     >
@@ -105,7 +105,7 @@ export function SleeperUsernameHelpModal({ open, onClose, panelRef }: Props) {
 
             <div
               ref={scrollBodyRef}
-              className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-6 py-6 sm:px-8 sm:py-8 space-y-10 sm:space-y-12"
+              className="dash-scrollbar flex-1 min-h-0 overflow-y-auto overscroll-contain px-6 py-6 sm:px-8 sm:py-8 space-y-10 sm:space-y-12"
             >
               {STEPS.map((step, index) => (
                 <section key={step.id} aria-labelledby={`${step.id}-title`} className="space-y-4 sm:space-y-5">

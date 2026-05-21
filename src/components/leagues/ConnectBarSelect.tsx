@@ -120,7 +120,7 @@ export function ConnectBarSelect({
           width: menuPos.width,
           zIndex: 100,
         }}
-        className="max-h-60 overflow-y-auto overscroll-contain rounded-[var(--dash-radius-sm)] border border-dash-border bg-dash-surface-elevated py-2 shadow-[0_8px_32px_rgba(0,0,0,0.45)]"
+        className="dash-scrollbar max-h-60 overflow-y-auto overscroll-contain rounded-[var(--dash-radius-sm)] border border-dash-border bg-dash-surface-elevated py-2 shadow-[0_8px_32px_rgba(0,0,0,0.45)]"
       >
         {options.map((opt) => {
           const isSelected = opt.value === value;

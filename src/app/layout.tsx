@@ -38,7 +38,7 @@ export default function RootLayout({
         <main
           id="main-content"
           tabIndex={-1}
-          className="flex-1 w-full max-w-6xl mx-auto px-4 py-8 sm:px-6 lg:px-8 outline-none"
+          className="dash-scrollbar flex-1 w-full max-w-6xl mx-auto px-4 py-8 sm:px-6 lg:px-8 outline-none"
         >
           {children}
         </main>

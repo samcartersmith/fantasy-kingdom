@@ -8,7 +8,7 @@ type ComingSoonPageProps = {
 
 export function ComingSoonPage({ title, description, relatedHref }: ComingSoonPageProps) {
   return (
-    <div className="editorial-page py-12 sm:py-16 lg:py-20 max-w-2xl">
+    <div className="max-w-2xl">
       <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.22em] text-home-muted mb-6">
         Coming soon
       </p>
@@ -25,12 +25,20 @@ export function ComingSoonPage({ title, description, relatedHref }: ComingSoonPa
           .
         </p>
       ) : null}
-      <Link
-        href="/"
-        className="inline-flex items-center justify-center min-h-11 px-5 rounded-[var(--dash-radius-sm)] border border-white/20 text-[11px] font-bold uppercase tracking-[0.12em] text-dash-text hover:border-home-accent hover:text-home-accent motion-safe:transition-colors duration-150"
-      >
-        Back to home
-      </Link>
+      <div className="flex flex-wrap gap-3">
+        <Link
+          href="/tools"
+          className="inline-flex items-center justify-center min-h-11 px-5 rounded-[var(--dash-radius-sm)] border border-white/20 text-[11px] font-bold uppercase tracking-[0.12em] text-dash-text hover:border-home-accent hover:text-home-accent motion-safe:transition-colors duration-150"
+        >
+          All tools
+        </Link>
+        <Link
+          href="/"
+          className="inline-flex items-center justify-center min-h-11 px-5 rounded-[var(--dash-radius-sm)] border border-white/20 text-[11px] font-bold uppercase tracking-[0.12em] text-dash-text hover:border-home-accent hover:text-home-accent motion-safe:transition-colors duration-150"
+        >
+          Back to home
+        </Link>
+      </div>
     </div>
   );
 }

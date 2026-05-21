@@ -143,7 +143,7 @@ export function TradeEvaluateModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 overflow-y-auto bg-black/55"
+      className="dash-scrollbar fixed inset-0 z-50 overflow-y-auto bg-black/55"
       role="presentation"
       onClick={onClose}
     >
@@ -183,7 +183,7 @@ export function TradeEvaluateModal({
 
             <div
               ref={scrollBodyRef}
-              className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 py-4 sm:px-6 sm:py-5"
+              className="dash-scrollbar flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 py-4 sm:px-6 sm:py-5"
             >
               <p className="text-sm sm:text-base text-dash-text/85 leading-snug mb-4">
                 {tradeEvaluationHeadline(total1, total2)}
