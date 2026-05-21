@@ -29,7 +29,7 @@ const teamSearchInputClass =
   "w-full min-h-10 rounded-[var(--dash-radius-sm)] border border-white/15 bg-black/35 px-3 py-2 text-sm text-dash-text placeholder:text-dash-text/40";
 
 const suggestionListClass =
-  "divide-y divide-white/10 rounded-[var(--dash-radius-sm)] border border-white/10 overflow-hidden max-h-[min(220px,32vh)] overflow-y-auto [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.35)_rgba(0,0,0,0.25)] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-black/30 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/30";
+  "dash-scrollbar divide-y divide-white/10 rounded-[var(--dash-radius-sm)] border border-white/10 overflow-hidden max-h-[min(220px,32vh)] overflow-y-auto bg-black/25";
 
 /** Stable DOM id for listbox options (asset ids may contain characters unsafe for HTML ids). */
 function comboboxOptionElementId(searchId: string, assetId: string): string {

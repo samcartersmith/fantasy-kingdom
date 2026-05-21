@@ -78,7 +78,7 @@ export function RankingsExplorer() {
 
       {rows && rows.length > 0 ? (
         <div className="dash-glass-panel rounded-[var(--dash-radius-md)] overflow-hidden">
-          <div className="overflow-x-auto max-h-[min(70vh,720px)] overflow-y-auto">
+          <div className="dash-scrollbar overflow-x-auto max-h-[min(70vh,720px)] overflow-y-auto bg-black/25">
             <table className="w-full text-sm text-left min-w-[640px]">
               <thead className="sticky top-0 z-[1] bg-dash-surface-elevated/95 backdrop-blur-sm border-b border-white/10">
                 <tr>

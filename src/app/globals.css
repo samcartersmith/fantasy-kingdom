@@ -16,6 +16,10 @@
   --dash-glass: rgba(255, 255, 255, 0.06);
   --dash-radius-sm: 8px;
   --dash-radius-md: 12px;
+  --dash-scrollbar-size: 8px;
+  --dash-scrollbar-thumb: rgba(255, 255, 255, 0.35);
+  --dash-scrollbar-thumb-hover: rgba(255, 255, 255, 0.5);
+  --dash-scrollbar-track: rgba(0, 0, 0, 0.4);
   /* Tool page title (h1) — matches Tailwind text-4xl font-bold tracking-tight */
   --dash-type-page-title-size: 2.25rem;
   --dash-type-page-title-line-height: 2.5rem;
@@ -97,6 +101,43 @@ body {
   transition: background-color 99999s ease-out;
 }
 
+/**
+ * Scrollbars app-wide: dark track, light thumb (viewport, modals, lists, tables).
+ * `.dash-scrollbar` is an optional explicit hook; new overflow regions pick this up automatically.
+ */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: var(--dash-scrollbar-thumb) var(--dash-scrollbar-track);
+}
+
+:where(*) {
+  scrollbar-width: thin;
+  scrollbar-color: var(--dash-scrollbar-thumb) var(--dash-scrollbar-track);
+}
+
+:where(*::-webkit-scrollbar) {
+  width: var(--dash-scrollbar-size);
+  height: var(--dash-scrollbar-size);
+}
+
+:where(*::-webkit-scrollbar-track) {
+  background: var(--dash-scrollbar-track);
+  border-radius: 4px;
+}
+
+:where(*::-webkit-scrollbar-thumb) {
+  background: var(--dash-scrollbar-thumb);
+  border-radius: 9999px;
+}
+
+:where(*::-webkit-scrollbar-thumb:hover) {
+  background: var(--dash-scrollbar-thumb-hover);
+}
+
+:where(*::-webkit-scrollbar-corner) {
+  background: var(--dash-scrollbar-track);
+}
+
 /** Tool page primary title (h1) — use with text-dash-text */
 .dash-heading-page {
   font-size: var(--dash-type-page-title-size);
@@ -161,6 +202,23 @@ body {
 @media (prefers-reduced-motion: no-preference) {
   .dash-animate-team-flash {
     animation: dash-team-flash 0.55s ease-out 1;
+  }
+}
+
+@keyframes leagues-wizard-step-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .leagues-wizard-step-enter {
+    animation: leagues-wizard-step-enter 0.2s cubic-bezier(0.25, 1, 0.5, 1);
   }
 }
 

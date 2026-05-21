@@ -101,17 +101,10 @@ export function HomeEditorialHero() {
               </p>
             </div>
 
-            <div className="home-reveal home-reveal--delay-2 flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3 sm:gap-5">
+            <div className="home-reveal home-reveal--delay-2">
               <Link
-                href="/trade"
+                href="/tools"
                 className="home-cta-primary inline-flex items-center justify-center gap-2 min-h-11 px-6 rounded-[var(--dash-radius-sm)] bg-home-accent text-[#050a14] text-[11px] font-bold uppercase tracking-[0.1em] hover:bg-home-accent-hover cursor-pointer focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-[#050a14] focus-visible:ring-home-accent"
-              >
-                Get started
-                {linkArrow}
-              </Link>
-              <Link
-                href="#tools-path"
-                className="group inline-flex items-center justify-center gap-2 min-h-11 px-1 text-[11px] font-bold uppercase tracking-[0.14em] text-home-accent hover:text-dash-text motion-safe:transition-colors motion-safe:duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-home-accent focus-visible:ring-offset-2 focus-visible:ring-offset-[#050a14]"
               >
                 Explore tools
                 {linkArrow}
@@ -146,7 +139,7 @@ export function HomeEditorialHero() {
           <ol className="flex flex-col gap-10 sm:gap-12 lg:gap-14 p-0 m-0">
             <StepRow
               step="1"
-              label="Start here"
+              label="Trade tools"
               title="Trade calculator"
               description="Compare players and picks, balance values, and confidently evaluate any trade."
               href="/trade"
@@ -156,7 +149,7 @@ export function HomeEditorialHero() {
 
             <StepRow
               step="2"
-              label="Next step"
+              label="Player research"
               title="Rankings"
               description="Explore dynasty rankings, tiers, and trending adds to stay ahead in your league."
               href="/rankings"
@@ -166,12 +159,11 @@ export function HomeEditorialHero() {
 
             <StepRow
               step="3"
-              label="Coming later"
-              title="Leagues"
-              description="League hub and trade sync are on the roadmap."
+              label="League tools"
+              title="Team evaluation"
+              description="Connect Sleeper, rank your roster, and get trade-oriented guidance for your team."
               href="/leagues"
-              linkLabel="Learn more"
-              muted
+              linkLabel="Evaluate your team"
               revealDelay="home-reveal--delay-6"
             />
           </ol>
