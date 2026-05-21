@@ -67,6 +67,18 @@ export type SleeperDraftPick = {
   roster_id: number;
   player_id: string | null;
   picked_by?: string;
+  /** Sleeper draft board column (1-based). */
+  draft_slot?: number;
+};
+
+/** Traded picks for a specific draft (`GET /draft/{id}/traded_picks`). */
+export type SleeperDraftTradedPick = {
+  season: string;
+  round: number;
+  /** Original slot owner roster id. */
+  roster_id: number;
+  previous_owner_id: number;
+  owner_id: number;
 };
 
 export type LeagueHistorySeason = {
@@ -88,6 +100,7 @@ export type SleeperRoster = {
 export type SleeperLeagueUser = {
   user_id: string;
   display_name: string;
+  avatar?: string | null;
   metadata?: { team_name?: string };
 };
 
