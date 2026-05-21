@@ -6,6 +6,7 @@ import { SleeperUsernameHelpModal } from "@/components/leagues/SleeperUsernameHe
 import { DraftExpertsExplorer } from "@/components/draft-experts/DraftExpertsExplorer";
 import { useSleeperConnect } from "@/hooks/useSleeperConnect";
 import type { DraftExpertsPayload } from "@/lib/draft-experts-build";
+import { parseJsonResponse } from "@/lib/fetch-json";
 
 type DraftExpertsHubProps = {
   onShowPageIntroChange?: (show: boolean) => void;
@@ -45,9 +46,8 @@ export function DraftExpertsHub({ onShowPageIntroChange }: DraftExpertsHubProps)
       setError(null);
       try {
         const res = await fetch(`/api/sleeper/draft-experts?league_id=${encodeURIComponent(leagueId)}`);
-        const body = await res.json();
-        if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
-        setPayload(body as DraftExpertsPayload);
+        const body = await parseJsonResponse<DraftExpertsPayload>(res);
+        setPayload(body);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Could not analyze drafts");
         setPayload(null);

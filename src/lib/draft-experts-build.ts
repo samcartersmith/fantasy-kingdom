@@ -10,6 +10,8 @@ import {
   type EnrichedPick,
   type StealBustRow,
 } from "@/lib/draft-experts-aggregate";
+import { buildDraftPlayerTradeValueResolver } from "@/lib/draft-player-trade-value";
+import { leagueContextFromSleeper } from "@/lib/league-context-from-sleeper";
 import { fetchSleeperNflPlayersMap, fetchSleeperTrendingAdds } from "@/lib/sleeper-fetch";
 import {
   fetchLeagueHistoryChain,
@@ -52,8 +54,8 @@ export type DraftExpertsPickRow = {
   playerName: string;
   position: string;
   currentValue: number;
-  expectedValue: number;
-  delta: number;
+  slotPoints: number;
+  vsSlotRatio: number;
 };
 
 export type DraftExpertsPayload = {
@@ -66,10 +68,10 @@ export type DraftExpertsPayload = {
   drafts: DraftExpertsIncludedDraft[];
   excludedDrafts: DraftExpertsExcludedDraft[];
   overview: {
-    effectiveness: { roster_id: number; name: string; avgDelta: number; pickCount: number }[];
+    effectiveness: { roster_id: number; name: string; avgVsSlotRatio: number; pickCount: number }[];
     mostPicks: { roster_id: number; name: string; pickCount: number }[];
-    bestDrafter: { roster_id: number; name: string; avgDelta: number } | null;
-    worstDrafter: { roster_id: number; name: string; avgDelta: number } | null;
+    bestDrafter: { roster_id: number; name: string; avgVsSlotRatio: number } | null;
+    worstDrafter: { roster_id: number; name: string; avgVsSlotRatio: number } | null;
   };
   bySeason: Record<string, { picks: DraftExpertsPickRow[] }>;
   steals: StealBustRow[];
@@ -95,6 +97,14 @@ export async function buildDraftExpertsPayload(
 
   if (!playersResult.ok) return null;
   const playersMap = playersResult.data;
+
+  const leagueContext = leagueContextFromSleeper(startLeague);
+  const tradeValues = await buildDraftPlayerTradeValueResolver(
+    leagueContext,
+    playersMap,
+    trendingAdds,
+  );
+  if (!tradeValues) return null;
 
   const nameByRoster = new Map<number, string>();
   const includedDrafts: DraftExpertsIncludedDraft[] = [];
@@ -144,6 +154,7 @@ export async function buildDraftExpertsPayload(
     if (!included) continue;
 
     const teams = teamCountFromDraft(included.draft, included.picks);
+    const totalRounds = maxRoundFromPicks(included.picks);
     const season = included.draft.season;
 
     includedDrafts.push({
@@ -151,7 +162,7 @@ export async function buildDraftExpertsPayload(
       draft_id: included.draft.draft_id,
       league_id: seasonEntry.league_id,
       pickCount: included.picks.length,
-      rounds: maxRoundFromPicks(included.picks),
+      rounds: totalRounds,
     });
 
     const seasonPicks: DraftExpertsPickRow[] = [];
@@ -165,8 +176,9 @@ export async function buildDraftExpertsPayload(
         included.draft.draft_id,
         managerName,
         player as SleeperNflPlayer | null,
-        pick.player_id ? (trendingAdds.get(pick.player_id) ?? 0) : 0,
+        tradeValues,
         teams,
+        totalRounds,
       );
       if (!enriched) {
         if (pick.player_id && pick.player_id !== "0") playersUnmatched += 1;
@@ -182,8 +194,8 @@ export async function buildDraftExpertsPayload(
         playerName: enriched.playerName,
         position: enriched.position,
         currentValue: enriched.currentValue,
-        expectedValue: enriched.expectedValue,
-        delta: enriched.delta,
+        slotPoints: enriched.slotPoints,
+        vsSlotRatio: enriched.vsSlotRatio,
       });
     }
 
@@ -219,14 +231,14 @@ export async function buildDraftExpertsPayload(
         ? {
             roster_id: effectiveness[0].roster_id,
             name: effectiveness[0].name,
-            avgDelta: effectiveness[0].avgDelta,
+            avgVsSlotRatio: effectiveness[0].avgVsSlotRatio,
           }
         : null,
       worstDrafter: effectiveness.length > 0
         ? {
             roster_id: effectiveness[effectiveness.length - 1]!.roster_id,
             name: effectiveness[effectiveness.length - 1]!.name,
-            avgDelta: effectiveness[effectiveness.length - 1]!.avgDelta,
+            avgVsSlotRatio: effectiveness[effectiveness.length - 1]!.avgVsSlotRatio,
           }
         : null,
     },
@@ -235,7 +247,7 @@ export async function buildDraftExpertsPayload(
     busts,
     meta: {
       dataNote:
-        "Pick grades use Sleeper search_rank and trending adds (same heuristic as Rankings), compared to an expected value curve by draft slot. Startup drafts with many rounds are excluded. Not ADP, market prices, or the trade model.",
+        "Pick pts follow a draft slot value curve aligned with trade calculator pick anchors (e.g. ~5,000 at 1.01, ~800 at the last pick in a 4-round board). Player trade pts use the same fair-trade model as the trade calculator for this league’s format. Vs slot is trade pts ÷ pick pts. Same curve for every season. Startup drafts with many rounds are excluded.",
       playersUnmatched,
       leagueSize,
     },

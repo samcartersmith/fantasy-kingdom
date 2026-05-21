@@ -1,4 +1,11 @@
-import { tradeValueFromSleeperSignals } from "@/lib/sleeper-ranking";
+import {
+  BUST_RATIO_THRESHOLD,
+  expectedSlotPoints,
+  gradeVsSlotRatio,
+  STEAL_RATIO_THRESHOLD,
+  vsSlotExcess,
+} from "@/lib/draft-slot-value";
+import type { DraftPlayerTradeValueResolver } from "@/lib/draft-player-trade-value";
 import type { SleeperDraft, SleeperDraftPick } from "@/lib/sleeper-league-types";
 import type { SleeperNflPlayer } from "@/lib/sleeper-types";
 
@@ -34,14 +41,15 @@ export type EnrichedPick = {
   season: string;
   draft_id: string;
   currentValue: number;
-  expectedValue: number;
-  delta: number;
+  slotPoints: number;
+  vsSlotRatio: number;
+  vsSlotExcess: number;
 };
 
 export type ManagerEffectivenessRow = {
   roster_id: number;
   name: string;
-  avgDelta: number;
+  avgVsSlotRatio: number;
   pickCount: number;
 };
 
@@ -61,8 +69,8 @@ export type StealBustRow = {
   playerName: string;
   position: string;
   currentValue: number;
-  expectedValue: number;
-  delta: number;
+  slotPoints: number;
+  vsSlotRatio: number;
 };
 
 export function teamCountFromDraft(draft: SleeperDraft, picks: SleeperDraftPick[]): number {
@@ -131,39 +139,24 @@ export function selectAnnualDraftForSeason(
   };
 }
 
-/**
- * Expected value at draft slot from pick number (lower pick_no = higher expectation).
- * Uses same scale as tradeValueFromSleeperSignals output.
- */
-export function expectedValueAtPickNo(pickNo: number, leagueSize: number): number {
-  const slot = Math.max(1, pickNo);
-  const teams = Math.max(4, leagueSize);
-  const totalSlots = teams * 5;
-  const t = (slot - 1) / Math.max(1, totalSlots - 1);
-  const top = tradeValueFromSleeperSignals(12, 0);
-  const floor = tradeValueFromSleeperSignals(900, 0);
-  return Math.round(top + (floor - top) * Math.min(1, t));
-}
-
 export function enrichPick(
   pick: SleeperDraftPick,
   season: string,
   draftId: string,
   managerName: string,
   player: SleeperNflPlayer | null,
-  trendingAdds: number,
+  tradeValues: DraftPlayerTradeValueResolver,
   leagueSize: number,
+  totalRounds: number,
 ): EnrichedPick | null {
   if (!pick.player_id || pick.player_id === "0") return null;
   if (!player) return null;
 
-  const sr =
-    typeof player.search_rank === "number" && Number.isFinite(player.search_rank) && player.search_rank > 0
-      ? player.search_rank
-      : null;
-  const currentValue = tradeValueFromSleeperSignals(sr, trendingAdds);
-  const expectedValue = expectedValueAtPickNo(pick.pick_no, leagueSize);
-  const delta = currentValue - expectedValue;
+  const currentValue = tradeValues.getTradeCalculatorValue(pick.player_id, player);
+  if (currentValue == null) return null;
+  const slotPoints = expectedSlotPoints(pick.pick_no, pick.round, leagueSize, totalRounds);
+  const ratio = gradeVsSlotRatio(currentValue, slotPoints);
+  const excess = vsSlotExcess(ratio);
 
   const name =
     [player.first_name, player.last_name].filter(Boolean).join(" ").trim() || `Player ${pick.player_id}`;
@@ -180,8 +173,9 @@ export function enrichPick(
     season,
     draft_id: draftId,
     currentValue,
-    expectedValue,
-    delta,
+    slotPoints,
+    vsSlotRatio: Math.round(ratio * 1000) / 1000,
+    vsSlotExcess: Math.round(excess * 1000) / 1000,
   };
 }
 
@@ -193,23 +187,23 @@ export function buildManagerEffectiveness(
   const byRoster = new Map<number, number[]>();
   for (const p of picks) {
     const list = byRoster.get(p.roster_id) ?? [];
-    list.push(p.delta);
+    list.push(p.vsSlotRatio);
     byRoster.set(p.roster_id, list);
   }
 
   const rows: ManagerEffectivenessRow[] = [];
-  for (const [roster_id, deltas] of byRoster) {
-    if (deltas.length < minPicks) continue;
-    const avgDelta = deltas.reduce((a, b) => a + b, 0) / deltas.length;
+  for (const [roster_id, ratios] of byRoster) {
+    if (ratios.length < minPicks) continue;
+    const avgVsSlotRatio = ratios.reduce((a, b) => a + b, 0) / ratios.length;
     rows.push({
       roster_id,
       name: nameByRoster.get(roster_id) ?? `Roster ${roster_id}`,
-      avgDelta: Math.round(avgDelta * 10) / 10,
-      pickCount: deltas.length,
+      avgVsSlotRatio: Math.round(avgVsSlotRatio * 100) / 100,
+      pickCount: ratios.length,
     });
   }
 
-  return rows.sort((a, b) => b.avgDelta - a.avgDelta || a.name.localeCompare(b.name));
+  return rows.sort((a, b) => b.avgVsSlotRatio - a.avgVsSlotRatio || a.name.localeCompare(b.name));
 }
 
 export function buildMostPicks(
@@ -231,8 +225,8 @@ export function buildMostPicks(
 
 export function buildSteals(picks: EnrichedPick[], cap = STEAL_BUST_CAP): StealBustRow[] {
   return [...picks]
-    .filter((p) => p.delta > 0)
-    .sort((a, b) => b.delta - a.delta)
+    .filter((p) => p.vsSlotRatio >= STEAL_RATIO_THRESHOLD)
+    .sort((a, b) => b.vsSlotRatio - a.vsSlotRatio)
     .slice(0, cap)
     .map(toStealBustRow);
 }
@@ -244,8 +238,8 @@ export function buildBusts(
 ): StealBustRow[] {
   const earlyCap = leagueSize * BUST_EARLY_PICK_MULTIPLIER;
   return [...picks]
-    .filter((p) => p.delta < 0 && p.pick_no <= earlyCap)
-    .sort((a, b) => a.delta - b.delta)
+    .filter((p) => p.vsSlotRatio <= BUST_RATIO_THRESHOLD && p.pick_no <= earlyCap)
+    .sort((a, b) => a.vsSlotRatio - b.vsSlotRatio)
     .slice(0, cap)
     .map(toStealBustRow);
 }
@@ -261,7 +255,7 @@ function toStealBustRow(p: EnrichedPick): StealBustRow {
     playerName: p.playerName,
     position: p.position,
     currentValue: p.currentValue,
-    expectedValue: p.expectedValue,
-    delta: p.delta,
+    slotPoints: p.slotPoints,
+    vsSlotRatio: p.vsSlotRatio,
   };
 }

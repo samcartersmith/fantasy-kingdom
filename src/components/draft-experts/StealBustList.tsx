@@ -1,5 +1,6 @@
 "use client";
 
+import { formatVsSlotRatio } from "@/components/draft-experts/format-vs-slot";
 import type { StealBustRow } from "@/lib/draft-experts-aggregate";
 
 type Props = {
@@ -8,11 +9,6 @@ type Props = {
   emptyMessage: string;
   variant: "steal" | "bust";
 };
-
-function formatDelta(delta: number): string {
-  const sign = delta > 0 ? "+" : "";
-  return `${sign}${delta.toLocaleString()}`;
-}
 
 export function StealBustList({ title, rows, emptyMessage, variant }: Props) {
   return (
@@ -31,7 +27,8 @@ export function StealBustList({ title, rows, emptyMessage, variant }: Props) {
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-dash-text truncate">{row.playerName}</p>
                   <p className="text-xs text-dash-text/60 mt-0.5">
-                    {row.season} · Pick {row.pick_no} · {row.managerName} · {row.position}
+                    {row.season} · Pick {row.pick_no} · {row.managerName} · {row.position} ·{" "}
+                    {row.slotPoints.toLocaleString()} pick pts
                   </p>
                 </div>
                 <span
@@ -39,7 +36,7 @@ export function StealBustList({ title, rows, emptyMessage, variant }: Props) {
                     variant === "steal" ? "text-dash-primary" : "text-dash-text/80"
                   }`}
                 >
-                  {formatDelta(row.delta)}
+                  {formatVsSlotRatio(row.vsSlotRatio)}
                 </span>
               </div>
             </li>

@@ -3,7 +3,7 @@ import fantasyProfileJson from "@/data/trade-model/player-fantasy-profile.json";
 import draftRoundJson from "@/data/trade-model/player-nfl-draft-round.json";
 import { applyPickFairTradeModel, getLocalPickAssets } from "@/lib/catalog";
 import { fetchSleeperNflPlayersMap, fetchSleeperTrendingAdds } from "@/lib/sleeper-fetch";
-import { sleeperPlayersMapToCatalogModeled } from "@/lib/sleeper-map";
+import { sleeperPlayersMapToCatalogModeled, type TradeCalculatorDisplayAnchor } from "@/lib/sleeper-map";
 import { buildFpAnchors, buildRichStatAnchors } from "@/lib/trade-model/fp-baseline";
 import type { FantasyProfilePayload } from "@/lib/trade-model/fp-baseline";
 import { createCuratedProviders } from "@/lib/trade-model/providers";
@@ -16,18 +16,12 @@ const curatedSnapshot = curatedSnapshotJson as CuratedTradeSnapshot;
 const fantasyProfilePayload = fantasyProfileJson as FantasyProfilePayload;
 const nflDraftRoundBySleeperId = draftRoundJson as Record<string, number>;
 
-export async function getModeledPlayerCatalog(
-  league: LeagueContext,
-): Promise<{ ok: true; assets: CatalogAsset[] } | { ok: false; error: string }> {
-  const [playersResult, trendingAdds] = await Promise.all([
-    fetchSleeperNflPlayersMap(),
-    fetchSleeperTrendingAdds(120, 72),
-  ]);
+export type ModeledCatalogBundle = {
+  assets: CatalogAsset[];
+  displayAnchor: TradeCalculatorDisplayAnchor;
+};
 
-  if (!playersResult.ok) {
-    return { ok: false, error: `Sleeper players API returned ${playersResult.status}` };
-  }
-
+export function createModeledCatalogScoringContext(league: LeagueContext) {
   const providers = createCuratedProviders(curatedSnapshot);
   const anchors = buildFpAnchors(fantasyProfilePayload.profiles, league.ppr);
   const richAnchors = buildRichStatAnchors(fantasyProfilePayload.profiles, league.ppr);
@@ -48,8 +42,24 @@ export async function getModeledPlayerCatalog(
     vbdScale: vbd.scale,
     tradeSpine,
   };
+  return { providers, fp, nflDraftRoundBySleeperId };
+}
 
-  const players = sleeperPlayersMapToCatalogModeled(
+export async function getModeledPlayerCatalog(
+  league: LeagueContext,
+): Promise<{ ok: true; assets: CatalogAsset[]; displayAnchor: TradeCalculatorDisplayAnchor } | { ok: false; error: string }> {
+  const [playersResult, trendingAdds] = await Promise.all([
+    fetchSleeperNflPlayersMap(),
+    fetchSleeperTrendingAdds(120, 72),
+  ]);
+
+  if (!playersResult.ok) {
+    return { ok: false, error: `Sleeper players API returned ${playersResult.status}` };
+  }
+
+  const { providers, fp, nflDraftRoundBySleeperId } = createModeledCatalogScoringContext(league);
+
+  const { assets: players, displayAnchor } = sleeperPlayersMapToCatalogModeled(
     playersResult.data,
     trendingAdds,
     providers,
@@ -59,7 +69,7 @@ export async function getModeledPlayerCatalog(
   );
   const picks = applyPickFairTradeModel(getLocalPickAssets(), providers);
 
-  return { ok: true, assets: [...picks, ...players] };
+  return { ok: true, assets: [...picks, ...players], displayAnchor };
 }
 
 export function catalogBySleeperPlayerId(assets: CatalogAsset[]): Map<string, CatalogAsset> {

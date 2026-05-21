@@ -68,9 +68,9 @@ export function DraftExpertsExplorer({ data, onChangeConnection }: Props) {
               {data.overview.bestDrafter ? (
                 <>
                   <span className="font-medium text-dash-text">{data.overview.bestDrafter.name}</span>{" "}
-                  leads on average value vs draft slot
-                  {data.overview.bestDrafter.avgDelta > 0
-                    ? ` (+${data.overview.bestDrafter.avgDelta})`
+                  leads on average vs draft slot
+                  {data.overview.bestDrafter.avgVsSlotRatio > 1
+                    ? ` (${Math.round(data.overview.bestDrafter.avgVsSlotRatio * 100)}%)`
                     : null}
                 </>
               ) : null}
@@ -79,7 +79,7 @@ export function DraftExpertsExplorer({ data, onChangeConnection }: Props) {
               data.overview.worstDrafter.roster_id !== data.overview.bestDrafter?.roster_id ? (
                 <>
                   <span className="font-medium text-dash-text">{data.overview.worstDrafter.name}</span>{" "}
-                  has the lowest average ({data.overview.worstDrafter.avgDelta}).
+                  has the lowest average ({Math.round(data.overview.worstDrafter.avgVsSlotRatio * 100)}% of slot).
                 </>
               ) : null}
             </p>
@@ -89,16 +89,16 @@ export function DraftExpertsExplorer({ data, onChangeConnection }: Props) {
             <div className="space-y-3">
               <h3 className="dash-heading-subsection text-dash-text">Draft effectiveness</h3>
               <p className="text-xs text-dash-text/60 leading-relaxed">
-                Average value vs expected slot (annual drafts only, min 3 picks).
+                Average player value vs slot points (annual drafts only, min 3 picks).
               </p>
               <DashBarChart
                 rows={data.overview.effectiveness.map((r) => ({
                   id: String(r.roster_id),
                   label: r.name,
-                  value: r.avgDelta,
+                  value: r.avgVsSlotRatio,
                   sublabel: `${r.pickCount} picks`,
                 }))}
-                valueFormat={(n) => (n > 0 ? `+${n}` : String(n))}
+                valueFormat={(n) => `${Math.round(n * 100)}%`}
                 emptyMessage="Need more picks to rank managers."
               />
             </div>

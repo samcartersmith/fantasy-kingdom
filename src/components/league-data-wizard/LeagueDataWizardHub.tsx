@@ -6,6 +6,7 @@ import { SleeperUsernameHelpModal } from "@/components/leagues/SleeperUsernameHe
 import { LeagueHistoryExplorer } from "@/components/league-data-wizard/LeagueHistoryExplorer";
 import { useSleeperConnect } from "@/hooks/useSleeperConnect";
 import type { LeagueHistoryPayload } from "@/lib/league-history-build";
+import { parseJsonResponse } from "@/lib/fetch-json";
 
 type LeagueDataWizardHubProps = {
   onShowPageIntroChange?: (show: boolean) => void;
@@ -44,9 +45,8 @@ export function LeagueDataWizardHub({ onShowPageIntroChange }: LeagueDataWizardH
     setError(null);
     try {
       const res = await fetch(`/api/sleeper/league-history?league_id=${encodeURIComponent(leagueId)}`);
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
-      setHistory(body as LeagueHistoryPayload);
+      const body = await parseJsonResponse<LeagueHistoryPayload>(res);
+      setHistory(body);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load league history");
       setHistory(null);

@@ -11,6 +11,30 @@ import type { FpScoringContext } from "@/lib/trade-model/fp-baseline";
 import { scorePlayer } from "@/lib/trade-model/score-player";
 import type { EvaluationComponent, LeagueContext, TradeModelProviders } from "@/lib/trade-model/types";
 
+export type TradeCalculatorDisplayAnchor = {
+  vmin: number;
+  vmax: number;
+  span: number;
+};
+
+export function tradeCalculatorDisplayAnchorFromRaws(raws: number[]): TradeCalculatorDisplayAnchor {
+  if (raws.length === 0) {
+    return { vmin: 0, vmax: 0, span: 0 };
+  }
+  const vmin = Math.min(...raws);
+  const vmax = Math.max(...raws);
+  return { vmin, vmax, span: vmax - vmin };
+}
+
+/** Maps one raw model total to 0–10,000 using the same anchor as the trade calculator catalog. */
+export function rawTradeValueToCalculatorDisplay(
+  raw: number,
+  anchor: TradeCalculatorDisplayAnchor,
+): number {
+  if (anchor.span <= 0) return 5000;
+  return Math.round((10_000 * (raw - anchor.vmin)) / anchor.span);
+}
+
 /**
  * Maps raw internal trade totals (same request cohort) to 0–10,000 display values; scales breakdown lines.
  */
@@ -18,13 +42,10 @@ function mapCatalogPlayerValuesToDisplayScale(
   rows: Array<{ base: Omit<CatalogAsset, "value" | "evaluation">; rawValue: number; confidence01: number; components: EvaluationComponent[] }>,
 ): CatalogAsset[] {
   if (rows.length === 0) return [];
-  const raws = rows.map((r) => r.rawValue);
-  const vmin = Math.min(...raws);
-  const vmax = Math.max(...raws);
-  const span = vmax - vmin;
+  const anchor = tradeCalculatorDisplayAnchorFromRaws(rows.map((r) => r.rawValue));
 
   return rows.map(({ base, rawValue, confidence01, components }) => {
-    const display = span > 0 ? Math.round((10_000 * (rawValue - vmin)) / span) : 5000;
+    const display = rawTradeValueToCalculatorDisplay(rawValue, anchor);
     const factor = rawValue !== 0 ? display / rawValue : 1;
     const scaled: EvaluationComponent[] = components.map((c) => ({
       ...c,
@@ -107,6 +128,57 @@ export function sleeperPlayersMapToCatalog(
  * fair-trade model: composite rank spine + merged VBD, curated factors, capped buzz, league context.
  * Player `value` is scaled to **0–10,000** across the returned cohort (single API response).
  */
+export type ModeledPlayerCatalogBuild = {
+  assets: CatalogAsset[];
+  displayAnchor: TradeCalculatorDisplayAnchor;
+};
+
+/** Score one Sleeper player with the trade model (no active-roster filter). */
+export function scoreSleeperPlayerRawTradeValue(
+  raw: SleeperNflPlayersMap[string],
+  trendingAdds: Map<string, number>,
+  providers: TradeModelProviders,
+  league: LeagueContext,
+  fp: FpScoringContext,
+  nflDraftRoundBySleeperId: Record<string, number>,
+): number | null {
+  if (!raw || typeof raw !== "object") return null;
+  const pid = String(raw.player_id ?? "");
+  if (!/^\d+$/.test(pid)) return null;
+  if (raw.sport && raw.sport !== "nfl") return null;
+
+  const skillPos = getSkillFantasyPositions(raw);
+  if (skillPos.length === 0) return null;
+
+  const sr =
+    typeof raw.search_rank === "number" && Number.isFinite(raw.search_rank) && raw.search_rank > 0
+      ? raw.search_rank
+      : null;
+  const ta = trendingAdds.get(pid) ?? 0;
+  const position = skillPositionsDisplay(skillPos);
+  const age = resolvePlayerAgeYears(raw.age, raw.years_exp);
+  const team = (raw.team ?? "").trim() || "FA";
+
+  return scorePlayer(
+    {
+      sleeperPlayerId: pid,
+      teamAbbr: team,
+      positionLabel: position,
+      searchRank: sr,
+      trendingAdds: ta,
+      age,
+      yearsExp: typeof raw.years_exp === "number" && Number.isFinite(raw.years_exp) ? raw.years_exp : null,
+      nflDraftRound:
+        typeof nflDraftRoundBySleeperId[pid] === "number" && Number.isFinite(nflDraftRoundBySleeperId[pid])
+          ? nflDraftRoundBySleeperId[pid]!
+          : null,
+    },
+    providers,
+    league,
+    fp,
+  ).value;
+}
+
 export function sleeperPlayersMapToCatalogModeled(
   map: SleeperNflPlayersMap,
   trendingAdds: Map<string, number>,
@@ -114,7 +186,7 @@ export function sleeperPlayersMapToCatalogModeled(
   league: LeagueContext,
   fp: FpScoringContext,
   nflDraftRoundBySleeperId: Record<string, number>,
-): CatalogAsset[] {
+): ModeledPlayerCatalogBuild {
   const staged: Array<{
     base: Omit<CatalogAsset, "value" | "evaluation">;
     rawValue: number;
@@ -181,7 +253,8 @@ export function sleeperPlayersMapToCatalogModeled(
     });
   }
 
+  const displayAnchor = tradeCalculatorDisplayAnchorFromRaws(staged.map((s) => s.rawValue));
   const scaled = mapCatalogPlayerValuesToDisplayScale(staged);
   scaled.sort((a, b) => a.name.localeCompare(b.name));
-  return scaled;
+  return { assets: scaled, displayAnchor };
 }

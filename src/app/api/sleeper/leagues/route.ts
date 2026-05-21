@@ -12,25 +12,30 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "user_id is required" }, { status: 400 });
   }
 
-  const seasons = currentNflSeasonYears();
-  const lists = await Promise.all(seasons.map((s) => fetchSleeperUserLeagues(userId, s)));
-  const byId = new Map<string, SleeperLeague>();
-  for (const list of lists) {
-    for (const league of list) {
-      if (!byId.has(league.league_id)) byId.set(league.league_id, league);
+  try {
+    const seasons = currentNflSeasonYears();
+    const lists = await Promise.all(seasons.map((s) => fetchSleeperUserLeagues(userId, s)));
+    const byId = new Map<string, SleeperLeague>();
+    for (const list of lists) {
+      for (const league of list) {
+        if (!byId.has(league.league_id)) byId.set(league.league_id, league);
+      }
     }
+
+    const leagues = [...byId.values()]
+      .filter(isDynastyLeague)
+      .map((l) => ({
+        league_id: l.league_id,
+        name: l.name,
+        season: l.season,
+        status: l.status,
+        total_rosters: l.total_rosters,
+      }))
+      .sort((a, b) => Number(b.season) - Number(a.season) || a.name.localeCompare(b.name));
+
+    return NextResponse.json({ leagues, seasonsQueried: seasons });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Failed to load Sleeper leagues";
+    return NextResponse.json({ error: message }, { status: 502 });
   }
-
-  const leagues = [...byId.values()]
-    .filter(isDynastyLeague)
-    .map((l) => ({
-      league_id: l.league_id,
-      name: l.name,
-      season: l.season,
-      status: l.status,
-      total_rosters: l.total_rosters,
-    }))
-    .sort((a, b) => Number(b.season) - Number(a.season) || a.name.localeCompare(b.name));
-
-  return NextResponse.json({ leagues, seasonsQueried: seasons });
 }
