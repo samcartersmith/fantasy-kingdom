@@ -79,6 +79,9 @@ const fieldClass =
 
 type Props = {
   mode?: SleeperConnectMode;
+  layout?: "page" | "modal";
+  /** Step 3 primary button when `mode="full"` (default: Analyze roster). */
+  teamStepPrimaryLabel?: string;
   /** Step 2 primary button when `mode="league-only"` (default: Load league history). */
   leagueOnlyPrimaryLabel?: string;
   step: WizardStep;
@@ -105,6 +108,8 @@ type Props = {
 
 export function SleeperConnectWizard({
   mode = "full",
+  layout = "page",
+  teamStepPrimaryLabel = "Analyze roster",
   leagueOnlyPrimaryLabel = "Load league history",
   step,
   username,
@@ -133,7 +138,16 @@ export function SleeperConnectWizard({
 
   const steps = isLeagueOnly ? LEAGUE_ONLY_STEPS : FULL_STEPS;
   const leagueOnlyCopy = leagueOnlyStepCopy(leagueOnlyPrimaryLabel);
-  const copy = isLeagueOnly ? leagueOnlyCopy[step as 1 | 2] : FULL_STEP_COPY[step];
+  const fullStepCopy: Record<WizardStep, StepCopy> = {
+    ...FULL_STEP_COPY,
+    3: { ...FULL_STEP_COPY[3], primaryLabel: teamStepPrimaryLabel },
+  };
+  const copy = isLeagueOnly ? leagueOnlyCopy[step as 1 | 2] : fullStepCopy[step];
+
+  const sectionClass =
+    layout === "modal"
+      ? "flex flex-col py-2"
+      : "flex min-h-[calc(100dvh-4.25rem)] flex-col justify-start pt-8 sm:pt-12 lg:pt-16 pb-12";
 
   useEffect(() => {
     requestAnimationFrame(() => {
@@ -167,10 +181,7 @@ export function SleeperConnectWizard({
   }
 
   return (
-    <section
-      className="flex min-h-[calc(100dvh-4.25rem)] flex-col justify-start pt-8 sm:pt-12 lg:pt-16 pb-12"
-      aria-labelledby={titleId}
-    >
+    <section className={sectionClass} aria-labelledby={titleId}>
       <div className="mx-auto w-full max-w-lg sm:max-w-xl space-y-8">
         <nav aria-label="Connect progress" className="flex items-center justify-center gap-2 sm:gap-4">
           {steps.map(({ step: s, label }, i) => {

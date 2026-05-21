@@ -6,7 +6,7 @@ import { ConnectBarSelect } from "@/components/leagues/ConnectBarSelect";
 import { SleeperConnectWizard } from "@/components/leagues/SleeperConnectWizard";
 import { SleeperUsernameHelpModal } from "@/components/leagues/SleeperUsernameHelpModal";
 import { TradeSuggestionsModal } from "@/components/trade/TradeSuggestionsModal";
-import { useSleeperConnect } from "@/hooks/useSleeperConnect";
+import { useSleeperConnectContext } from "@/contexts/SleeperConnectContext";
 import type { GuidanceInsight, RosterPlayerRow, RosterSlot } from "@/lib/roster-guidance";
 import type { TradeSuggestion } from "@/lib/trade-suggestions";
 
@@ -70,7 +70,7 @@ type LeaguesHubProps = {
 };
 
 export function LeaguesHub({ onShowPageIntroChange }: LeaguesHubProps) {
-  const sleeper = useSleeperConnect({ mode: "full" });
+  const sleeper = useSleeperConnectContext();
   const {
     username,
     setUsername,
@@ -87,7 +87,7 @@ export function LeaguesHub({ onShowPageIntroChange }: LeaguesHubProps) {
     connectUsername,
     onLeagueChange,
     wizardBack,
-    openConnection,
+    openConnectModal,
     leagueWizardOptions,
     teamWizardOptions,
     leaguesLoading,
@@ -286,8 +286,8 @@ export function LeaguesHub({ onShowPageIntroChange }: LeaguesHubProps) {
     setResult(null);
     resetSuggestionState();
     setTeamPickerOpen(false);
-    openConnection();
-  }, [openConnection, resetSuggestionState]);
+    openConnectModal();
+  }, [openConnectModal, resetSuggestionState]);
 
   const wizardBackWithReset = useCallback(() => {
     setResult(null);

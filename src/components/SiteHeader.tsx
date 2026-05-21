@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { UserAccountMenu } from "@/components/account/UserAccountMenu";
 
 const navItems = [
   { href: "/", label: "Home", match: (p: string) => p === "/" },
@@ -18,8 +19,6 @@ const navLinkActive = "text-home-accent";
 
 export function SiteHeader() {
   const pathname = usePathname();
-  const useHomeChrome =
-    pathname === "/" || pathname.startsWith("/leagues") || pathname.startsWith("/tools");
 
   return (
     <header
@@ -68,16 +67,7 @@ export function SiteHeader() {
               </Link>
             ))}
           </nav>
-          <Link
-            href="/trade"
-            className={
-              useHomeChrome
-                ? "hidden sm:inline-flex items-center justify-center min-h-10 px-4 rounded-[var(--dash-radius-sm)] bg-home-accent text-[#050a14] text-[11px] font-bold uppercase tracking-[0.12em] hover:bg-home-accent-hover motion-safe:transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-home-accent focus-visible:ring-offset-2 focus-visible:ring-offset-[#050a14]"
-                : "hidden sm:inline-flex items-center justify-center min-h-10 px-4 rounded-[var(--dash-radius-sm)] bg-dash-primary text-dash-text text-sm font-semibold hover:bg-dash-primary/90 motion-safe:transition-colors duration-150"
-            }
-          >
-            {useHomeChrome ? "Get started" : "Trade calculator"}
-          </Link>
+          <UserAccountMenu />
         </div>
       </div>
     </header>

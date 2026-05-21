@@ -1,10 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { SleeperConnectWizard } from "@/components/leagues/SleeperConnectWizard";
-import { SleeperUsernameHelpModal } from "@/components/leagues/SleeperUsernameHelpModal";
+import { LeagueToolConnectPanel } from "@/components/account/LeagueToolConnectPanel";
 import { LeagueHistoryExplorer } from "@/components/league-data-wizard/LeagueHistoryExplorer";
-import { useSleeperConnect } from "@/hooks/useSleeperConnect";
+import { useSleeperConnectContext } from "@/contexts/SleeperConnectContext";
 import type { LeagueHistoryPayload } from "@/lib/league-history-build";
 import { parseJsonResponse } from "@/lib/fetch-json";
 
@@ -15,45 +14,38 @@ type LeagueDataWizardHubProps = {
 export function LeagueDataWizardHub({ onShowPageIntroChange }: LeagueDataWizardHubProps) {
   const [history, setHistory] = useState<LeagueHistoryPayload | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
-  const [usernameHelpOpen, setUsernameHelpOpen] = useState(false);
 
-  const sleeper = useSleeperConnect({ mode: "league-only" });
   const {
-    username,
-    setUsername,
-    leagues,
+    connectionSummary,
     selectedLeagueId,
     error,
     setError,
-    loading,
-    wizardStep,
-    connectUsername,
-    onLeagueChange,
-    wizardBack,
-    openConnection,
-    leagueWizardOptions,
-    leaguesLoading,
-    canProceedFromLeague,
-  } = sleeper;
+    openConnectModal,
+  } = useSleeperConnectContext();
 
   useEffect(() => {
     onShowPageIntroChange?.(!history);
   }, [history, onShowPageIntroChange]);
 
-  const loadHistory = useCallback(async (leagueId: string) => {
-    setHistoryLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/sleeper/league-history?league_id=${encodeURIComponent(leagueId)}`);
-      const body = await parseJsonResponse<LeagueHistoryPayload>(res);
-      setHistory(body);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not load league history");
-      setHistory(null);
-    } finally {
-      setHistoryLoading(false);
-    }
-  }, [setError]);
+  const loadHistory = useCallback(
+    async (leagueId: string) => {
+      setHistoryLoading(true);
+      setError(null);
+      try {
+        const res = await fetch(
+          `/api/sleeper/league-history?league_id=${encodeURIComponent(leagueId)}`,
+        );
+        const body = await parseJsonResponse<LeagueHistoryPayload>(res);
+        setHistory(body);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Could not load league history");
+        setHistory(null);
+      } finally {
+        setHistoryLoading(false);
+      }
+    },
+    [setError],
+  );
 
   const handleAnalyze = useCallback(() => {
     if (!selectedLeagueId) return;
@@ -62,10 +54,10 @@ export function LeagueDataWizardHub({ onShowPageIntroChange }: LeagueDataWizardH
 
   const handleChangeConnection = useCallback(() => {
     setHistory(null);
-    openConnection();
-  }, [openConnection]);
+    openConnectModal();
+  }, [openConnectModal]);
 
-  const showWizard = !history && !historyLoading;
+  const showConnectPanel = !history && !historyLoading;
 
   return (
     <div className="w-full min-w-0 space-y-6 lg:space-y-8">
@@ -98,43 +90,20 @@ export function LeagueDataWizardHub({ onShowPageIntroChange }: LeagueDataWizardH
         </section>
       ) : null}
 
-      {showWizard ? (
-        <SleeperConnectWizard
-          mode="league-only"
-          step={wizardStep}
-          username={username}
-          onUsernameChange={setUsername}
-          leagueOptions={leagueWizardOptions}
-          teamOptions={[]}
+      {showConnectPanel ? (
+        <LeagueToolConnectPanel
+          connectionSummary={connectionSummary}
           selectedLeagueId={selectedLeagueId}
-          selectedRosterId=""
-          leaguesLoading={leaguesLoading}
-          teamsLoading={false}
-          loading={loading || historyLoading}
-          canAnalyze={false}
-          canProceedFromLeague={canProceedFromLeague}
-          leagueEmptyMessage={
-            leagues && leagues.length === 0
-              ? "No dynasty leagues found for this account in the current or previous season."
-              : undefined
-          }
-          onConnect={() => void connectUsername()}
-          onLeagueSelect={onLeagueChange}
-          onTeamSelect={() => {}}
+          primaryLabel="Load league history"
+          loading={historyLoading}
           onAnalyze={handleAnalyze}
-          onBack={wizardBack}
-          onOpenUsernameHelp={() => setUsernameHelpOpen(true)}
+          onOpenConnect={openConnectModal}
         />
       ) : null}
 
       {history ? (
         <LeagueHistoryExplorer data={history} onChangeConnection={handleChangeConnection} />
       ) : null}
-
-      <SleeperUsernameHelpModal
-        open={usernameHelpOpen}
-        onClose={() => setUsernameHelpOpen(false)}
-      />
     </div>
   );
 }

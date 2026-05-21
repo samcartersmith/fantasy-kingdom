@@ -1,10 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { SleeperConnectWizard } from "@/components/leagues/SleeperConnectWizard";
-import { SleeperUsernameHelpModal } from "@/components/leagues/SleeperUsernameHelpModal";
+import { LeagueToolConnectPanel } from "@/components/account/LeagueToolConnectPanel";
 import { DraftExpertsExplorer } from "@/components/draft-experts/DraftExpertsExplorer";
-import { useSleeperConnect } from "@/hooks/useSleeperConnect";
+import { useSleeperConnectContext } from "@/contexts/SleeperConnectContext";
 import type { DraftExpertsPayload } from "@/lib/draft-experts-build";
 import { parseJsonResponse } from "@/lib/fetch-json";
 
@@ -16,26 +15,14 @@ export function DraftExpertsHub({ onShowPageIntroChange }: DraftExpertsHubProps)
   const [payload, setPayload] = useState<DraftExpertsPayload | null>(null);
   const [analysisLeagueId, setAnalysisLeagueId] = useState<string | null>(null);
   const [analysisLoading, setAnalysisLoading] = useState(false);
-  const [usernameHelpOpen, setUsernameHelpOpen] = useState(false);
 
-  const sleeper = useSleeperConnect({ mode: "league-only" });
   const {
-    username,
-    setUsername,
-    leagues,
+    connectionSummary,
     selectedLeagueId,
     error,
     setError,
-    loading,
-    wizardStep,
-    connectUsername,
-    onLeagueChange,
-    wizardBack,
-    openConnection,
-    leagueWizardOptions,
-    leaguesLoading,
-    canProceedFromLeague,
-  } = sleeper;
+    openConnectModal,
+  } = useSleeperConnectContext();
 
   useEffect(() => {
     onShowPageIntroChange?.(!payload);
@@ -74,10 +61,10 @@ export function DraftExpertsHub({ onShowPageIntroChange }: DraftExpertsHubProps)
   const handleChangeConnection = useCallback(() => {
     setPayload(null);
     setAnalysisLeagueId(null);
-    openConnection();
-  }, [openConnection]);
+    openConnectModal();
+  }, [openConnectModal]);
 
-  const showWizard = !payload && !analysisLoading;
+  const showConnectPanel = !payload && !analysisLoading;
 
   return (
     <div className="w-full min-w-0 space-y-6 lg:space-y-8">
@@ -110,33 +97,14 @@ export function DraftExpertsHub({ onShowPageIntroChange }: DraftExpertsHubProps)
         </section>
       ) : null}
 
-      {showWizard ? (
-        <SleeperConnectWizard
-          mode="league-only"
-          leagueOnlyPrimaryLabel="Analyze drafts"
-          step={wizardStep}
-          username={username}
-          onUsernameChange={setUsername}
-          leagueOptions={leagueWizardOptions}
-          teamOptions={[]}
+      {showConnectPanel ? (
+        <LeagueToolConnectPanel
+          connectionSummary={connectionSummary}
           selectedLeagueId={selectedLeagueId}
-          selectedRosterId=""
-          leaguesLoading={leaguesLoading}
-          teamsLoading={false}
-          loading={loading || analysisLoading}
-          canAnalyze={false}
-          canProceedFromLeague={canProceedFromLeague}
-          leagueEmptyMessage={
-            leagues && leagues.length === 0
-              ? "No dynasty leagues found for this account in the current or previous season."
-              : undefined
-          }
-          onConnect={() => void connectUsername()}
-          onLeagueSelect={onLeagueChange}
-          onTeamSelect={() => {}}
+          primaryLabel="Analyze drafts"
+          loading={analysisLoading}
           onAnalyze={handleAnalyze}
-          onBack={wizardBack}
-          onOpenUsernameHelp={() => setUsernameHelpOpen(true)}
+          onOpenConnect={openConnectModal}
         />
       ) : null}
 
@@ -148,8 +116,6 @@ export function DraftExpertsHub({ onShowPageIntroChange }: DraftExpertsHubProps)
           isRefreshing={analysisLoading}
         />
       ) : null}
-
-      <SleeperUsernameHelpModal open={usernameHelpOpen} onClose={() => setUsernameHelpOpen(false)} />
     </div>
   );
 }
