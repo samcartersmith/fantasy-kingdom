@@ -46,17 +46,17 @@ export const TOOLS: ToolEntry[] = [
   {
     id: "draft-experts",
     title: "Draft experts",
-    blurb: "Analyst-style draft takes and class notes (coming soon).",
+    blurb: "Grade dynasty drafts: manager effectiveness, boards by year, steals, and busts.",
     href: "/draft-experts",
-    available: false,
+    available: true,
     icon: <DraftExpertsIcon />,
   },
   {
     id: "league-data-wizard",
     title: "League data wizard",
-    blurb: "Import league settings and roster context in guided steps (coming soon).",
+    blurb: "Connect Sleeper and explore charts from your league's history across seasons.",
     href: "/league-data-wizard",
-    available: false,
+    available: true,
     icon: <LeagueDataWizardIcon />,
   },
   {

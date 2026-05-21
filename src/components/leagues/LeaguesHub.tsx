@@ -3,15 +3,12 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ConnectBarSelect } from "@/components/leagues/ConnectBarSelect";
-import { SleeperConnectWizard, type WizardStep } from "@/components/leagues/SleeperConnectWizard";
+import { SleeperConnectWizard } from "@/components/leagues/SleeperConnectWizard";
 import { SleeperUsernameHelpModal } from "@/components/leagues/SleeperUsernameHelpModal";
 import { TradeSuggestionsModal } from "@/components/trade/TradeSuggestionsModal";
-import type { WizardOption } from "@/components/leagues/WizardOptionList";
+import { useSleeperConnect } from "@/hooks/useSleeperConnect";
 import type { GuidanceInsight, RosterPlayerRow, RosterSlot } from "@/lib/roster-guidance";
 import type { TradeSuggestion } from "@/lib/trade-suggestions";
-
-type LeagueOption = { league_id: string; name: string; season: string; status: string; total_rosters: number };
-type TeamOption = { roster_id: number; name: string; player_count: number };
 
 type GuidanceResponse = {
   league: { name: string; season: string; status: string };
@@ -73,15 +70,32 @@ type LeaguesHubProps = {
 };
 
 export function LeaguesHub({ onShowPageIntroChange }: LeaguesHubProps) {
-  const [username, setUsername] = useState("");
-  const [leagues, setLeagues] = useState<LeagueOption[] | null>(null);
-  const [selectedLeagueId, setSelectedLeagueId] = useState("");
-  const [teams, setTeams] = useState<TeamOption[] | null>(null);
-  const [selectedRosterId, setSelectedRosterId] = useState("");
+  const sleeper = useSleeperConnect({ mode: "full" });
+  const {
+    username,
+    setUsername,
+    leagues,
+    selectedLeagueId,
+    teams,
+    selectedRosterId,
+    setSelectedRosterId,
+    error,
+    setError,
+    loading,
+    setLoading,
+    wizardStep,
+    connectUsername,
+    onLeagueChange,
+    wizardBack,
+    openConnection,
+    leagueWizardOptions,
+    teamWizardOptions,
+    leaguesLoading,
+    teamsLoading,
+    canAnalyze,
+  } = sleeper;
+
   const [result, setResult] = useState<GuidanceResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [wizardStep, setWizardStep] = useState<WizardStep>(1);
   const [teamPickerOpen, setTeamPickerOpen] = useState(false);
   const [sessionFlash, setSessionFlash] = useState(false);
   const [suggestionsOpen, setSuggestionsOpen] = useState(false);
@@ -105,16 +119,6 @@ export function LeaguesHub({ onShowPageIntroChange }: LeaguesHubProps) {
     remainingFetchStarted.current = false;
   }, []);
 
-  const resetBelowUser = useCallback(() => {
-    setLeagues(null);
-    setSelectedLeagueId("");
-    setTeams(null);
-    setSelectedRosterId("");
-    setResult(null);
-    resetSuggestionState();
-    setTeamPickerOpen(false);
-  }, [resetSuggestionState]);
-
   useEffect(() => {
     onShowPageIntroChange?.(Boolean(result));
   }, [result, onShowPageIntroChange]);
@@ -128,66 +132,20 @@ export function LeaguesHub({ onShowPageIntroChange }: LeaguesHubProps) {
     }
   }, [result]);
 
-  const connectUsername = useCallback(async () => {
-    const q = username.trim();
-    if (!q) return;
-    setLoading(true);
-    setError(null);
-    resetBelowUser();
-    setWizardStep(1);
-    try {
-      const res = await fetch(`/api/sleeper/user?username=${encodeURIComponent(q)}`);
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
-      const lgRes = await fetch(`/api/sleeper/leagues?user_id=${encodeURIComponent(body.user.user_id)}`);
-      const lgBody = await lgRes.json();
-      if (!lgRes.ok) throw new Error(lgBody.error || `HTTP ${lgRes.status}`);
-      setLeagues(lgBody.leagues);
-      if (lgBody.leagues.length === 0) {
-        setError("No dynasty leagues found for this user in the current or previous NFL season.");
-      } else {
-        setWizardStep(2);
-      }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not connect Sleeper account");
-    } finally {
-      setLoading(false);
-    }
-  }, [username, resetBelowUser]);
-
-  const loadTeamsForLeague = useCallback(async (id: string, advanceWizard: boolean) => {
-    setLoading(true);
-    setError(null);
-    setTeams(null);
-    setSelectedRosterId("");
-    setResult(null);
-    try {
-      const res = await fetch(`/api/sleeper/league-teams?league_id=${encodeURIComponent(id)}`);
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
-      setTeams(body.teams);
-      if (body.teams.length === 1) {
-        setSelectedRosterId(String(body.teams[0].roster_id));
-      }
-      if (advanceWizard && body.teams.length > 0) {
-        setWizardStep(3);
-      }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not load league teams");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  const onLeagueChange = useCallback(
+  const onLeagueChangeWithReset = useCallback(
     (id: string) => {
-      setSelectedLeagueId(id);
       setResult(null);
       resetSuggestionState();
-      if (id) void loadTeamsForLeague(id, true);
+      onLeagueChange(id);
     },
-    [loadTeamsForLeague, resetSuggestionState],
+    [onLeagueChange, resetSuggestionState],
   );
+
+  const connectUsernameWithReset = useCallback(async () => {
+    setResult(null);
+    resetSuggestionState();
+    await connectUsername();
+  }, [connectUsername, resetSuggestionState]);
 
   const fetchSuggestions = useCallback(
     async (opts: { limit: number; offset: number; exclude?: string[] }) => {
@@ -228,7 +186,7 @@ export function LeaguesHub({ onShowPageIntroChange }: LeaguesHubProps) {
     } finally {
       setLoading(false);
     }
-  }, [selectedLeagueId, selectedRosterId, resetSuggestionState]);
+  }, [selectedLeagueId, selectedRosterId, resetSuggestionState, setError, setLoading]);
 
   useEffect(() => {
     if (!result || !selectedLeagueId || !selectedRosterId) return;
@@ -324,38 +282,18 @@ export function LeaguesHub({ onShowPageIntroChange }: LeaguesHubProps) {
     });
   }, [suggestionsOpen]);
 
-  const openConnection = useCallback(() => {
+  const openConnectionFull = useCallback(() => {
     setResult(null);
-    setWizardStep(1);
-    setLeagues(null);
-    setSelectedLeagueId("");
-    setTeams(null);
-    setSelectedRosterId("");
-    setError(null);
     resetSuggestionState();
     setTeamPickerOpen(false);
-  }, [resetSuggestionState]);
+    openConnection();
+  }, [openConnection, resetSuggestionState]);
 
-  const wizardBack = useCallback(() => {
-    setError(null);
-    if (wizardStep === 3) {
-      setWizardStep(2);
-      setTeams(null);
-      setSelectedRosterId("");
-      setResult(null);
-      resetSuggestionState();
-      return;
-    }
-    if (wizardStep === 2) {
-      setWizardStep(1);
-      setLeagues(null);
-      setSelectedLeagueId("");
-      setTeams(null);
-      setSelectedRosterId("");
-      setResult(null);
-      resetSuggestionState();
-    }
-  }, [wizardStep, resetSuggestionState]);
+  const wizardBackWithReset = useCallback(() => {
+    setResult(null);
+    resetSuggestionState();
+    wizardBack();
+  }, [wizardBack, resetSuggestionState]);
 
   const displayInsights = useMemo(
     () => result?.guidance.insights.filter((i) => i.id !== "value-rank") ?? [],
@@ -367,24 +305,6 @@ export function LeaguesHub({ onShowPageIntroChange }: LeaguesHubProps) {
     [result],
   );
 
-  const leagueWizardOptions: WizardOption[] = useMemo(() => {
-    if (!leagues?.length) return [];
-    return leagues.map((l) => ({
-      value: l.league_id,
-      label: l.name,
-      hint: `${l.season} · ${l.total_rosters} teams`,
-    }));
-  }, [leagues]);
-
-  const teamWizardOptions: WizardOption[] = useMemo(() => {
-    if (!teams?.length) return [];
-    return teams.map((t) => ({
-      value: String(t.roster_id),
-      label: t.name,
-      hint: `${t.player_count} players`,
-    }));
-  }, [teams]);
-
   const teamSelectOptions = useMemo(() => {
     if (!teams?.length) return [];
     return teams.map((t) => ({
@@ -392,13 +312,6 @@ export function LeaguesHub({ onShowPageIntroChange }: LeaguesHubProps) {
       label: `${t.name} (${t.player_count})`,
     }));
   }, [teams]);
-
-  const leaguesLoading = wizardStep === 2 && loading && leagues === null;
-  const teamsLoading =
-    (wizardStep === 2 && loading && !!selectedLeagueId && teams === null) ||
-    (wizardStep === 3 && loading && teams === null);
-
-  const canAnalyze = Boolean(selectedLeagueId && selectedRosterId && teams && teams.length > 0);
 
   return (
     <div className="leagues-hub w-full min-w-0 space-y-6 lg:space-y-8">
@@ -413,6 +326,7 @@ export function LeaguesHub({ onShowPageIntroChange }: LeaguesHubProps) {
             </div>
           ) : null}
           <SleeperConnectWizard
+            mode="full"
             step={wizardStep}
             username={username}
             onUsernameChange={setUsername}
@@ -432,11 +346,11 @@ export function LeaguesHub({ onShowPageIntroChange }: LeaguesHubProps) {
             teamEmptyMessage={
               teams && teams.length === 0 ? "No teams found for this league." : undefined
             }
-            onConnect={() => void connectUsername()}
-            onLeagueSelect={onLeagueChange}
+            onConnect={() => void connectUsernameWithReset()}
+            onLeagueSelect={onLeagueChangeWithReset}
             onTeamSelect={setSelectedRosterId}
             onAnalyze={() => void analyzeRoster()}
-            onBack={wizardBack}
+            onBack={wizardBackWithReset}
             onOpenUsernameHelp={() => setUsernameHelpOpen(true)}
           />
         </>
@@ -493,7 +407,7 @@ export function LeaguesHub({ onShowPageIntroChange }: LeaguesHubProps) {
                 >
                   Re-analyze
                 </button>
-                <button type="button" className={btnSecondary} onClick={openConnection}>
+                <button type="button" className={btnSecondary} onClick={openConnectionFull}>
                   Change connection
                 </button>
               </div>
