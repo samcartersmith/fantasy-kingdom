@@ -14,19 +14,26 @@ import { buildDraftPlayerTradeValueResolver } from "@/lib/draft-player-trade-val
 import { leagueContextFromSleeper } from "@/lib/league-context-from-sleeper";
 import { fetchSleeperNflPlayersMap, fetchSleeperTrendingAdds } from "@/lib/sleeper-fetch";
 import {
+  draftPickTradeMeta,
+  draftSlotTradeLookup,
   fetchLeagueHistoryChain,
   fetchSleeperDraftPicks,
+  fetchSleeperDraftTradedPicks,
   fetchSleeperLeague,
   fetchSleeperLeagueDrafts,
   fetchSleeperLeagueRosters,
   fetchSleeperLeagueUsers,
+  rosterAvatarUrl,
   rosterDisplayName,
 } from "@/lib/sleeper-league-fetch";
+import { buildSlotColumnHeaders, type DraftSlotColumnHeader } from "@/lib/draft-board-slot";
+import type { SleeperDraftPick } from "@/lib/sleeper-league-types";
 import type { SleeperNflPlayer } from "@/lib/sleeper-types";
 
 export type DraftExpertsManager = {
   roster_id: number;
   name: string;
+  avatarUrl?: string;
 };
 
 export type DraftExpertsIncludedDraft = {
@@ -45,6 +52,16 @@ export type DraftExpertsExcludedDraft = {
   maxRound: number;
 };
 
+export type DraftPickTradeFields = {
+  pickedByUserId?: string;
+  pickedByName?: string;
+  isTradedOrProxy: boolean;
+  isSlotTrade: boolean;
+  slotOwnerName?: string;
+  tradedToName?: string;
+  draft_slot?: number;
+};
+
 export type DraftExpertsPickRow = {
   pick_no: number;
   round: number;
@@ -53,10 +70,42 @@ export type DraftExpertsPickRow = {
   playerId: string;
   playerName: string;
   position: string;
+  team: string;
+  imageUrl: string;
   currentValue: number;
   slotPoints: number;
   vsSlotRatio: number;
-};
+} & DraftPickTradeFields;
+
+export type DraftBoardSkipReason = "no_selection" | "player_not_in_cache" | "no_trade_value";
+
+export type DraftBoardPickRow =
+  | ({ status: "graded" } & DraftExpertsPickRow)
+  | {
+      status: "skipped";
+      skipReason: DraftBoardSkipReason;
+      pick_no: number;
+      round: number;
+      roster_id: number;
+      managerName: string;
+      playerId?: string;
+      playerName?: string;
+    } & DraftPickTradeFields;
+
+export function boardSkipLabel(reason: DraftBoardSkipReason): string {
+  switch (reason) {
+    case "no_selection":
+      return "No player selected";
+    case "player_not_in_cache":
+      return "Player not in Sleeper cache";
+    case "no_trade_value":
+      return "Could not grade trade value";
+  }
+}
+
+export function sleeperPlayerImageUrl(playerId: string): string {
+  return `https://sleepercdn.com/content/nfl/players/${playerId}.jpg`;
+}
 
 export type DraftExpertsPayload = {
   league: {
@@ -73,7 +122,15 @@ export type DraftExpertsPayload = {
     bestDrafter: { roster_id: number; name: string; avgVsSlotRatio: number } | null;
     worstDrafter: { roster_id: number; name: string; avgVsSlotRatio: number } | null;
   };
-  bySeason: Record<string, { picks: DraftExpertsPickRow[] }>;
+  bySeason: Record<
+    string,
+    {
+      picks: DraftExpertsPickRow[];
+      boardPicks: DraftBoardPickRow[];
+      teams: number;
+      slotHeaders: DraftSlotColumnHeader[];
+    }
+  >;
   steals: StealBustRow[];
   busts: StealBustRow[];
   meta: {
@@ -107,9 +164,18 @@ export async function buildDraftExpertsPayload(
   if (!tradeValues) return null;
 
   const nameByRoster = new Map<number, string>();
+  const avatarByRoster = new Map<number, string>();
   const includedDrafts: DraftExpertsIncludedDraft[] = [];
   const excludedDrafts: DraftExpertsExcludedDraft[] = [];
-  const bySeason: Record<string, { picks: DraftExpertsPickRow[] }> = {};
+  const bySeason: Record<
+    string,
+    {
+      picks: DraftExpertsPickRow[];
+      boardPicks: DraftBoardPickRow[];
+      teams: number;
+      slotHeaders: DraftSlotColumnHeader[];
+    }
+  > = {};
   const allEnriched: EnrichedPick[] = [];
   let playersUnmatched = 0;
   let leagueSize = startLeague.total_rosters || 12;
@@ -129,17 +195,25 @@ export async function buildDraftExpertsPayload(
     for (const r of rosters) {
       if (!nameByRoster.has(r.roster_id)) {
         nameByRoster.set(r.roster_id, rosterDisplayName(r.roster_id, users, rosters));
+        const avatar = rosterAvatarUrl(r.roster_id, users, rosters);
+        if (avatar) avatarByRoster.set(r.roster_id, avatar);
       }
     }
 
     const withPicks = await Promise.all(
-      draftList.map(async (draft) => ({
-        draft,
-        picks: await fetchSleeperDraftPicks(draft.draft_id),
-      })),
+      draftList.map(async (draft) => {
+        const [picks, tradedPicks] = await Promise.all([
+          fetchSleeperDraftPicks(draft.draft_id),
+          fetchSleeperDraftTradedPicks(draft.draft_id),
+        ]);
+        return { draft, picks, tradedPicks };
+      }),
     );
 
-    const { included, excluded } = selectAnnualDraftForSeason(withPicks);
+    const { included, excluded } = selectAnnualDraftForSeason(
+      withPicks.map(({ draft, picks }) => ({ draft, picks })),
+    );
+    const includedBundle = withPicks.find((w) => w.draft.draft_id === included?.draft.draft_id);
 
     for (const ex of excluded) {
       excludedDrafts.push({
@@ -151,9 +225,10 @@ export async function buildDraftExpertsPayload(
       });
     }
 
-    if (!included) continue;
+    if (!included || !includedBundle) continue;
 
     const teams = teamCountFromDraft(included.draft, included.picks);
+    const slotTradesByKey = draftSlotTradeLookup(includedBundle.tradedPicks);
     const totalRounds = maxRoundFromPicks(included.picks);
     const season = included.draft.season;
 
@@ -166,10 +241,39 @@ export async function buildDraftExpertsPayload(
     });
 
     const seasonPicks: DraftExpertsPickRow[] = [];
+    const boardPicks: DraftBoardPickRow[] = [];
+
+    const tradeMetaForPick = (raw: SleeperDraftPick) =>
+      draftPickTradeMeta(raw, users, rosters, nameByRoster, slotTradesByKey, teams);
 
     for (const pick of [...included.picks].sort((a, b) => a.pick_no - b.pick_no)) {
       const player = pick.player_id ? playersMap[pick.player_id] : null;
       const managerName = nameByRoster.get(pick.roster_id) ?? `Roster ${pick.roster_id}`;
+      const trade = tradeMetaForPick(pick);
+      const base = {
+        pick_no: pick.pick_no,
+        round: pick.round,
+        roster_id: pick.roster_id,
+        managerName,
+        ...trade,
+      };
+
+      if (!pick.player_id || pick.player_id === "0") {
+        boardPicks.push({ status: "skipped", skipReason: "no_selection", ...base });
+        continue;
+      }
+
+      if (!player) {
+        playersUnmatched += 1;
+        boardPicks.push({
+          status: "skipped",
+          skipReason: "player_not_in_cache",
+          ...base,
+          playerId: pick.player_id,
+        });
+        continue;
+      }
+
       const enriched = enrichPick(
         pick,
         season,
@@ -181,11 +285,23 @@ export async function buildDraftExpertsPayload(
         totalRounds,
       );
       if (!enriched) {
-        if (pick.player_id && pick.player_id !== "0") playersUnmatched += 1;
+        playersUnmatched += 1;
+        const name =
+          [player.first_name, player.last_name].filter(Boolean).join(" ").trim() ||
+          `Player ${pick.player_id}`;
+        boardPicks.push({
+          status: "skipped",
+          skipReason: "no_trade_value",
+          ...base,
+          playerId: pick.player_id,
+          playerName: name,
+        });
         continue;
       }
+
       allEnriched.push(enriched);
-      seasonPicks.push({
+      const nflPlayer = player as SleeperNflPlayer | null;
+      const graded: DraftExpertsPickRow = {
         pick_no: enriched.pick_no,
         round: enriched.round,
         roster_id: enriched.roster_id,
@@ -193,13 +309,31 @@ export async function buildDraftExpertsPayload(
         playerId: enriched.playerId,
         playerName: enriched.playerName,
         position: enriched.position,
+        team: (nflPlayer?.team ?? "").trim() || "FA",
+        imageUrl: sleeperPlayerImageUrl(enriched.playerId),
         currentValue: enriched.currentValue,
         slotPoints: enriched.slotPoints,
         vsSlotRatio: enriched.vsSlotRatio,
-      });
+        ...trade,
+      };
+      seasonPicks.push(graded);
+      boardPicks.push({ status: "graded", ...graded });
     }
 
-    bySeason[season] = { picks: seasonPicks };
+    const slotHeaders = buildSlotColumnHeaders(
+      teams,
+      includedBundle.tradedPicks,
+      boardPicks,
+      nameByRoster,
+      Object.fromEntries(
+        [...nameByRoster.entries()].map(([id, name]) => [
+          String(id),
+          { roster_id: id, name, avatarUrl: avatarByRoster.get(id) },
+        ]),
+      ),
+    );
+
+    bySeason[season] = { picks: seasonPicks, boardPicks, teams, slotHeaders };
   }
 
   includedDrafts.sort((a, b) => Number(b.season) - Number(a.season));
@@ -208,11 +342,15 @@ export async function buildDraftExpertsPayload(
   const effectiveness = buildManagerEffectiveness(allEnriched, nameByRoster);
   const mostPicks = buildMostPicks(allEnriched, nameByRoster);
   const steals = buildSteals(allEnriched);
-  const busts = buildBusts(allEnriched, leagueSize);
+  const busts = buildBusts(allEnriched);
 
   const managers: Record<string, DraftExpertsManager> = {};
   for (const [roster_id, name] of nameByRoster) {
-    managers[String(roster_id)] = { roster_id, name };
+    managers[String(roster_id)] = {
+      roster_id,
+      name,
+      avatarUrl: avatarByRoster.get(roster_id),
+    };
   }
 
   return {

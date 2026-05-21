@@ -14,6 +14,7 @@ type DraftExpertsHubProps = {
 
 export function DraftExpertsHub({ onShowPageIntroChange }: DraftExpertsHubProps) {
   const [payload, setPayload] = useState<DraftExpertsPayload | null>(null);
+  const [analysisLeagueId, setAnalysisLeagueId] = useState<string | null>(null);
   const [analysisLoading, setAnalysisLoading] = useState(false);
   const [usernameHelpOpen, setUsernameHelpOpen] = useState(false);
 
@@ -48,6 +49,7 @@ export function DraftExpertsHub({ onShowPageIntroChange }: DraftExpertsHubProps)
         const res = await fetch(`/api/sleeper/draft-experts?league_id=${encodeURIComponent(leagueId)}`);
         const body = await parseJsonResponse<DraftExpertsPayload>(res);
         setPayload(body);
+        setAnalysisLeagueId(leagueId);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Could not analyze drafts");
         setPayload(null);
@@ -63,8 +65,15 @@ export function DraftExpertsHub({ onShowPageIntroChange }: DraftExpertsHubProps)
     void loadDraftAnalysis(selectedLeagueId);
   }, [selectedLeagueId, loadDraftAnalysis]);
 
+  const handleRefreshAnalysis = useCallback(() => {
+    const leagueId = analysisLeagueId ?? selectedLeagueId;
+    if (!leagueId) return;
+    void loadDraftAnalysis(leagueId);
+  }, [analysisLeagueId, selectedLeagueId, loadDraftAnalysis]);
+
   const handleChangeConnection = useCallback(() => {
     setPayload(null);
+    setAnalysisLeagueId(null);
     openConnection();
   }, [openConnection]);
 
@@ -132,7 +141,12 @@ export function DraftExpertsHub({ onShowPageIntroChange }: DraftExpertsHubProps)
       ) : null}
 
       {payload ? (
-        <DraftExpertsExplorer data={payload} onChangeConnection={handleChangeConnection} />
+        <DraftExpertsExplorer
+          data={payload}
+          onChangeConnection={handleChangeConnection}
+          onRefreshAnalysis={handleRefreshAnalysis}
+          isRefreshing={analysisLoading}
+        />
       ) : null}
 
       <SleeperUsernameHelpModal open={usernameHelpOpen} onClose={() => setUsernameHelpOpen(false)} />

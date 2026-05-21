@@ -4,6 +4,7 @@ import type {
   SleeperBracketMatch,
   SleeperDraft,
   SleeperDraftPick,
+  SleeperDraftTradedPick,
   SleeperLeague,
   SleeperLeagueUser,
   SleeperMatchup,
@@ -134,12 +135,82 @@ export async function fetchSleeperLeagueDrafts(leagueId: string): Promise<Sleepe
   return result.data.filter((d) => d?.draft_id);
 }
 
+function coerceRosterId(value: unknown): number {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const n = Number.parseInt(value, 10);
+    if (Number.isFinite(n)) return n;
+  }
+  return 0;
+}
+
+function normalizeDraftPick(raw: Record<string, unknown>): SleeperDraftPick | null {
+  const pick_no = typeof raw.pick_no === "number" ? raw.pick_no : Number(raw.pick_no);
+  const round = typeof raw.round === "number" ? raw.round : Number(raw.round);
+  const roster_id = coerceRosterId(raw.roster_id);
+  if (!Number.isFinite(pick_no) || !Number.isFinite(round) || roster_id < 1) return null;
+  const draft_slot =
+    typeof raw.draft_slot === "number"
+      ? raw.draft_slot
+      : raw.draft_slot != null
+        ? Number(raw.draft_slot)
+        : undefined;
+  return {
+    pick_no,
+    round,
+    roster_id,
+    player_id:
+      raw.player_id == null || raw.player_id === ""
+        ? null
+        : String(raw.player_id),
+    picked_by:
+      raw.picked_by == null || raw.picked_by === ""
+        ? undefined
+        : String(raw.picked_by),
+    draft_slot: Number.isFinite(draft_slot) && draft_slot! >= 1 ? draft_slot : undefined,
+  };
+}
+
 export async function fetchSleeperDraftPicks(draftId: string): Promise<SleeperDraftPick[]> {
-  const result = await sleeperGet<SleeperDraftPick[]>(
+  const result = await sleeperGet<Record<string, unknown>[]>(
     `${SLEEPER_API_V1_BASE}/draft/${encodeURIComponent(draftId)}/picks`,
   );
   if (!result.ok || !Array.isArray(result.data)) return [];
-  return result.data;
+  const out: SleeperDraftPick[] = [];
+  for (const row of result.data) {
+    if (row && typeof row === "object") {
+      const pick = normalizeDraftPick(row);
+      if (pick) out.push(pick);
+    }
+  }
+  return out;
+}
+
+export async function fetchSleeperDraftTradedPicks(
+  draftId: string,
+): Promise<SleeperDraftTradedPick[]> {
+  const result = await sleeperGet<Record<string, unknown>[]>(
+    `${SLEEPER_API_V1_BASE}/draft/${encodeURIComponent(draftId)}/traded_picks`,
+  );
+  if (!result.ok || !Array.isArray(result.data)) return [];
+  const out: SleeperDraftTradedPick[] = [];
+  for (const row of result.data) {
+    if (!row || typeof row !== "object") continue;
+    const round = typeof row.round === "number" ? row.round : Number(row.round);
+    const roster_id = coerceRosterId(row.roster_id);
+    const owner_id = coerceRosterId(row.owner_id);
+    const previous_owner_id = coerceRosterId(row.previous_owner_id);
+    const season = String(row.season ?? "");
+    if (!season || !Number.isFinite(round) || roster_id < 1 || owner_id < 1) continue;
+    out.push({
+      season,
+      round,
+      roster_id,
+      previous_owner_id: previous_owner_id >= 1 ? previous_owner_id : roster_id,
+      owner_id,
+    });
+  }
+  return out;
 }
 
 const MAX_HISTORY_SEASONS = 25;
@@ -213,16 +284,125 @@ export function regularSeasonWeekLimit(league: SleeperLeague): number {
   return 14;
 }
 
+export function rosterOwner(
+  rosterId: number,
+  users: SleeperLeagueUser[],
+  rosters: SleeperRoster[],
+): SleeperLeagueUser | undefined {
+  const roster = rosters.find((r) => r.roster_id === rosterId);
+  return roster?.owner_id ? users.find((u) => u.user_id === roster.owner_id) : undefined;
+}
+
+export function sleeperAvatarUrl(avatar: string | null | undefined): string | undefined {
+  const id = avatar?.trim();
+  if (!id) return undefined;
+  return `https://sleepercdn.com/avatars/${id}`;
+}
+
 export function rosterDisplayName(
   rosterId: number,
   users: SleeperLeagueUser[],
   rosters: SleeperRoster[],
 ): string {
-  const roster = rosters.find((r) => r.roster_id === rosterId);
-  const owner = roster?.owner_id ? users.find((u) => u.user_id === roster.owner_id) : undefined;
+  const owner = rosterOwner(rosterId, users, rosters);
   return (
     owner?.metadata?.team_name?.trim() ||
     owner?.display_name?.trim() ||
     `Roster ${rosterId}`
   );
+}
+
+export function rosterAvatarUrl(
+  rosterId: number,
+  users: SleeperLeagueUser[],
+  rosters: SleeperRoster[],
+): string | undefined {
+  return sleeperAvatarUrl(rosterOwner(rosterId, users, rosters)?.avatar);
+}
+
+export function leagueUserDisplayName(user: SleeperLeagueUser): string {
+  return user.metadata?.team_name?.trim() || user.display_name?.trim() || "Unknown";
+}
+
+export type DraftPickTradeMeta = {
+  pickedByUserId?: string;
+  pickedByName?: string;
+  /** Someone other than the roster owner made the selection (proxy, commish). */
+  isTradedOrProxy: boolean;
+  /** Pre-draft slot trade: pick landed with a new owner. */
+  isSlotTrade: boolean;
+  /** Display name of the original slot owner (header / table manager column). */
+  slotOwnerName?: string;
+  /** Team that acquired the slot and made the pick (shown after →). */
+  tradedToName?: string;
+  draft_slot?: number;
+};
+
+export function draftSlotTradeLookup(
+  traded: SleeperDraftTradedPick[],
+): Map<string, SleeperDraftTradedPick> {
+  const map = new Map<string, SleeperDraftTradedPick>();
+  for (const t of traded) {
+    if (t.owner_id !== t.roster_id) {
+      map.set(`${t.round}-${t.roster_id}`, t);
+    }
+  }
+  return map;
+}
+
+export function draftPickTradeMeta(
+  pick: { roster_id: number; picked_by?: string; draft_slot?: number; round: number },
+  users: SleeperLeagueUser[],
+  rosters: SleeperRoster[],
+  nameByRoster: Map<number, string>,
+  slotTradesByKey: Map<string, SleeperDraftTradedPick>,
+  teamsInDraft: number,
+): DraftPickTradeMeta {
+  const owner = rosterOwner(pick.roster_id, users, rosters);
+  const picker = pick.picked_by ? users.find((u) => u.user_id === pick.picked_by) : undefined;
+  const pickedByName = picker ? leagueUserDisplayName(picker) : undefined;
+  const isTradedOrProxy = Boolean(
+    pick.picked_by && owner?.user_id && pick.picked_by !== owner.user_id,
+  );
+
+  const slotKeys = [
+    pick.draft_slot != null ? `${pick.round}-${pick.draft_slot}` : null,
+    `${pick.round}-${pick.roster_id}`,
+  ].filter(Boolean) as string[];
+
+  let slotTrade: SleeperDraftTradedPick | undefined;
+  for (const key of slotKeys) {
+    slotTrade = slotTradesByKey.get(key);
+    if (slotTrade) break;
+  }
+  if (!slotTrade) {
+    slotTrade = [...slotTradesByKey.values()].find(
+      (t) =>
+        t.round === pick.round &&
+        t.owner_id === pick.roster_id &&
+        t.owner_id !== t.roster_id,
+    );
+  }
+
+  const isSlotTrade = Boolean(
+    slotTrade &&
+      slotTrade.owner_id === pick.roster_id &&
+      slotTrade.owner_id !== slotTrade.roster_id,
+  );
+  const slotOwnerRosterId = slotTrade?.roster_id ?? pick.roster_id;
+  const slotOwnerName =
+    nameByRoster.get(slotOwnerRosterId) ?? `Roster ${slotOwnerRosterId}`;
+  const tradedToName = isSlotTrade
+    ? nameByRoster.get(pick.roster_id) ?? `Roster ${pick.roster_id}`
+    : undefined;
+
+  return {
+    pickedByUserId: pick.picked_by,
+    pickedByName,
+    isTradedOrProxy: isSlotTrade ? false : isTradedOrProxy,
+    isSlotTrade,
+    slotOwnerName,
+    tradedToName,
+    draft_slot: pick.draft_slot,
+  };
 }

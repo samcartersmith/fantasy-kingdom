@@ -12,8 +12,12 @@ import type { SleeperNflPlayer } from "@/lib/sleeper-types";
 export const STARTUP_ROUNDS_THRESHOLD = 10;
 export const STARTUP_PICKS_PER_TEAM_MULTIPLIER = 8;
 export const MIN_PICKS_FOR_EFFECTIVENESS = 3;
-export const BUST_EARLY_PICK_MULTIPLIER = 3;
 export const STEAL_BUST_CAP = 25;
+
+/** Steals must be outside the first-round premium window (picks 1–6). */
+export const STEAL_MIN_PICK_NO = 7;
+/** Busts only count for picks in the first two rounds of a 12-team draft (pick 24 or earlier). */
+export const BUST_MAX_PICK_NO = 24;
 
 export type DraftWithPicks = {
   draft: SleeperDraft;
@@ -223,22 +227,25 @@ export function buildMostPicks(
     .sort((a, b) => b.pickCount - a.pickCount || a.name.localeCompare(b.name));
 }
 
+export function isStealPick(p: Pick<EnrichedPick, "pick_no" | "vsSlotRatio">): boolean {
+  return p.pick_no >= STEAL_MIN_PICK_NO && p.vsSlotRatio >= STEAL_RATIO_THRESHOLD;
+}
+
+export function isBustPick(p: Pick<EnrichedPick, "pick_no" | "vsSlotRatio">): boolean {
+  return p.pick_no <= BUST_MAX_PICK_NO && p.vsSlotRatio <= BUST_RATIO_THRESHOLD;
+}
+
 export function buildSteals(picks: EnrichedPick[], cap = STEAL_BUST_CAP): StealBustRow[] {
   return [...picks]
-    .filter((p) => p.vsSlotRatio >= STEAL_RATIO_THRESHOLD)
+    .filter(isStealPick)
     .sort((a, b) => b.vsSlotRatio - a.vsSlotRatio)
     .slice(0, cap)
     .map(toStealBustRow);
 }
 
-export function buildBusts(
-  picks: EnrichedPick[],
-  leagueSize: number,
-  cap = STEAL_BUST_CAP,
-): StealBustRow[] {
-  const earlyCap = leagueSize * BUST_EARLY_PICK_MULTIPLIER;
+export function buildBusts(picks: EnrichedPick[], cap = STEAL_BUST_CAP): StealBustRow[] {
   return [...picks]
-    .filter((p) => p.vsSlotRatio <= BUST_RATIO_THRESHOLD && p.pick_no <= earlyCap)
+    .filter(isBustPick)
     .sort((a, b) => a.vsSlotRatio - b.vsSlotRatio)
     .slice(0, cap)
     .map(toStealBustRow);

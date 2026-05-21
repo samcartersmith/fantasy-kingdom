@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { expectedSlotPoints } from "@/lib/draft-slot-value";
 import {
+  buildBusts,
   buildManagerEffectiveness,
   buildSteals,
+  isBustPick,
   isStartupDraft,
+  isStealPick,
   selectAnnualDraftForSeason,
 } from "@/lib/draft-experts-aggregate";
+import type { EnrichedPick } from "@/lib/draft-experts-aggregate";
 import type { SleeperDraft, SleeperDraftPick } from "@/lib/sleeper-league-types";
 
 function draft(id: string, season: string, rounds?: number, teams?: number): SleeperDraft {
@@ -65,6 +69,49 @@ describe("slot curve via enrich pipeline fields", () => {
   });
 });
 
+function enriched(overrides: Partial<EnrichedPick> & Pick<EnrichedPick, "pick_no" | "vsSlotRatio">): EnrichedPick {
+  return {
+    round: 1,
+    roster_id: 1,
+    managerName: "A",
+    playerId: "1",
+    playerName: "P",
+    position: "RB",
+    season: "2023",
+    draft_id: "d",
+    currentValue: 1000,
+    slotPoints: 500,
+    vsSlotExcess: 0,
+    ...overrides,
+  };
+}
+
+describe("steal and bust pick rules", () => {
+  it("excludes first-six picks from steals even when ratio is high", () => {
+    expect(isStealPick(enriched({ pick_no: 1, vsSlotRatio: 2 }))).toBe(false);
+    expect(isStealPick(enriched({ pick_no: 6, vsSlotRatio: 1.5 }))).toBe(false);
+    expect(isStealPick(enriched({ pick_no: 7, vsSlotRatio: 1.15 }))).toBe(true);
+    expect(isStealPick(enriched({ pick_no: 7, vsSlotRatio: 1.1 }))).toBe(false);
+  });
+
+  it("limits busts to pick 24 or earlier with low vs-slot ratio", () => {
+    expect(isBustPick(enriched({ pick_no: 24, vsSlotRatio: 0.8 }))).toBe(true);
+    expect(isBustPick(enriched({ pick_no: 25, vsSlotRatio: 0.5 }))).toBe(false);
+    expect(isBustPick(enriched({ pick_no: 12, vsSlotRatio: 0.9 }))).toBe(false);
+  });
+
+  it("buildSteals and buildBusts apply pick windows", () => {
+    const picks = [
+      enriched({ pick_no: 1, vsSlotRatio: 2, playerId: "early" }),
+      enriched({ pick_no: 10, vsSlotRatio: 1.2, playerId: "steal" }),
+      enriched({ pick_no: 20, vsSlotRatio: 0.7, playerId: "bust" }),
+      enriched({ pick_no: 30, vsSlotRatio: 0.5, playerId: "late" }),
+    ];
+    expect(buildSteals(picks).map((r) => r.playerId)).toEqual(["steal"]);
+    expect(buildBusts(picks).map((r) => r.playerId)).toEqual(["bust"]);
+  });
+});
+
 describe("buildManagerEffectiveness and steals", () => {
   it("ranks managers by average vs-slot ratio", () => {
     const picks = [
@@ -99,12 +146,12 @@ describe("buildManagerEffectiveness and steals", () => {
         vsSlotExcess: 0.3,
       },
       {
-        pick_no: 6,
+        pick_no: 10,
         round: 2,
         roster_id: 1,
         managerName: "A",
-        playerId: "6",
-        playerName: "P6",
+        playerId: "10",
+        playerName: "P10",
         position: "WR",
         season: "2023",
         draft_id: "d",

@@ -1,13 +1,17 @@
 "use client";
 
+import { DraftSlotTradePill } from "@/components/draft-experts/DraftSlotTradePill";
 import { formatVsSlotRatio, vsSlotRatioMeetsBar } from "@/components/draft-experts/format-vs-slot";
+import { PickTradeBadge } from "@/components/draft-experts/PickTradeBadge";
 import type { DraftExpertsPickRow } from "@/lib/draft-experts-build";
+import { formatDraftSlotForPick } from "@/lib/draft-board-slot";
 
 type Props = {
   picks: DraftExpertsPickRow[];
+  leagueSize: number;
 };
 
-export function DraftBoardTable({ picks }: Props) {
+export function DraftBoardTable({ picks, leagueSize }: Props) {
   if (picks.length === 0) {
     return (
       <p className="text-sm text-dash-text/75 leading-relaxed">
@@ -22,10 +26,7 @@ export function DraftBoardTable({ picks }: Props) {
         <thead>
           <tr className="border-b border-white/15 text-left">
             <th className="py-2 pr-3 font-semibold text-xs uppercase tracking-wide text-dash-text/65">
-              Pick
-            </th>
-            <th className="py-2 pr-3 font-semibold text-xs uppercase tracking-wide text-dash-text/65">
-              Rd
+              Slot
             </th>
             <th className="py-2 pr-3 font-semibold text-xs uppercase tracking-wide text-dash-text/65">
               Manager
@@ -48,35 +49,60 @@ export function DraftBoardTable({ picks }: Props) {
           </tr>
         </thead>
         <tbody>
-          {picks.map((row) => (
-            <tr
-              key={`${row.pick_no}-${row.playerId}`}
-              className="border-b border-white/8 hover:bg-white/[0.04]"
-            >
-              <td className="py-2.5 pr-3 tabular-nums text-dash-text">{row.pick_no}</td>
-              <td className="py-2.5 pr-3 tabular-nums text-dash-text/80">{row.round}</td>
-              <td className="py-2.5 pr-3 text-dash-text max-w-[8rem] truncate">{row.managerName}</td>
-              <td className="py-2.5 pr-3 font-medium text-dash-text max-w-[10rem] truncate">
-                {row.playerName}
-              </td>
-              <td className="py-2.5 pr-3 text-dash-text/75">{row.position}</td>
-              <td className="py-2.5 pr-3 tabular-nums text-dash-text/80 text-right">
-                {row.slotPoints.toLocaleString()}
-              </td>
-              <td className="py-2.5 pr-3 tabular-nums text-dash-text text-right">
-                {row.currentValue.toLocaleString()}
-              </td>
-              <td className="py-2.5 tabular-nums text-right font-medium">
-                <span
-                  className={
-                    vsSlotRatioMeetsBar(row.vsSlotRatio) ? "text-dash-primary" : "text-dash-text/75"
-                  }
+          {picks.map((row) => {
+            const showSlotTrade =
+              row.isSlotTrade &&
+              row.tradedToName &&
+              row.slotOwnerName &&
+              row.tradedToName !== row.slotOwnerName;
+
+            return (
+              <tr
+                key={`${row.pick_no}-${row.playerId}`}
+                className="border-b border-white/8 hover:bg-white/[0.04]"
+              >
+                <td
+                  className="py-2.5 pr-3 tabular-nums font-medium text-dash-text"
+                  title={`Overall pick ${row.pick_no}`}
                 >
-                  {formatVsSlotRatio(row.vsSlotRatio)}
-                </span>
-              </td>
-            </tr>
-          ))}
+                  {formatDraftSlotForPick(row, leagueSize)}
+                </td>
+                <td className="py-2.5 pr-3 text-dash-text max-w-[10rem]">
+                  <span className="block truncate">
+                    {showSlotTrade ? row.slotOwnerName : row.managerName}
+                  </span>
+                  {showSlotTrade ? (
+                    <DraftSlotTradePill tradedToName={row.tradedToName!} className="mt-1" />
+                  ) : (
+                    <PickTradeBadge
+                      isTradedOrProxy={row.isTradedOrProxy ?? false}
+                      pickedByName={row.pickedByName}
+                      className="mt-1"
+                    />
+                  )}
+                </td>
+                <td className="py-2.5 pr-3 font-medium text-dash-text max-w-[10rem] truncate">
+                  {row.playerName}
+                </td>
+                <td className="py-2.5 pr-3 text-dash-text/75">{row.position}</td>
+                <td className="py-2.5 pr-3 tabular-nums text-dash-text/80 text-right">
+                  {row.slotPoints.toLocaleString()}
+                </td>
+                <td className="py-2.5 pr-3 tabular-nums text-dash-text text-right">
+                  {row.currentValue.toLocaleString()}
+                </td>
+                <td className="py-2.5 tabular-nums text-right font-medium">
+                  <span
+                    className={
+                      vsSlotRatioMeetsBar(row.vsSlotRatio) ? "text-dash-primary" : "text-dash-text/75"
+                    }
+                  >
+                    {formatVsSlotRatio(row.vsSlotRatio)}
+                  </span>
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
