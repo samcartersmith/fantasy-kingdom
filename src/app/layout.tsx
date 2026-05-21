@@ -3,6 +3,7 @@ import { IBM_Plex_Sans, Instrument_Serif } from "next/font/google";
 import "./globals.css";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
+import { AppProviders } from "@/components/providers/AppProviders";
 
 const ibmPlexSans = IBM_Plex_Sans({
   subsets: ["latin"],
@@ -34,15 +35,17 @@ export default function RootLayout({
         <a href="#main-content" className="skip-link">
           Skip to main content
         </a>
-        <SiteHeader />
-        <main
-          id="main-content"
-          tabIndex={-1}
-          className="dash-scrollbar flex-1 w-full max-w-6xl mx-auto px-4 py-8 sm:px-6 lg:px-8 outline-none"
-        >
-          {children}
-        </main>
-        <SiteFooter />
+        <AppProviders>
+          <SiteHeader />
+          <main
+            id="main-content"
+            tabIndex={-1}
+            className="dash-scrollbar flex-1 w-full max-w-6xl mx-auto px-4 py-8 sm:px-6 lg:px-8 outline-none"
+          >
+            {children}
+          </main>
+          <SiteFooter />
+        </AppProviders>
       </body>
     </html>
   );
