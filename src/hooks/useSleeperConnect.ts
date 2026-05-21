@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useState } from "react";
 import type { WizardOption } from "@/components/leagues/WizardOptionList";
 import type { WizardStep } from "@/components/leagues/SleeperConnectWizard";
+import { parseJsonResponse } from "@/lib/fetch-json";
 
 export type SleeperLeagueOption = {
   league_id: string;
@@ -55,11 +56,11 @@ export function useSleeperConnect(options: UseSleeperConnectOptions = {}) {
     setWizardStep(1);
     try {
       const res = await fetch(`/api/sleeper/user?username=${encodeURIComponent(q)}`);
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
-      const lgRes = await fetch(`/api/sleeper/leagues?user_id=${encodeURIComponent(body.user.user_id)}`);
-      const lgBody = await lgRes.json();
-      if (!lgRes.ok) throw new Error(lgBody.error || `HTTP ${lgRes.status}`);
+      const body = await parseJsonResponse<{ user: { user_id: string } }>(res);
+      const lgRes = await fetch(
+        `/api/sleeper/leagues?user_id=${encodeURIComponent(body.user.user_id)}`,
+      );
+      const lgBody = await parseJsonResponse<{ leagues: SleeperLeagueOption[] }>(lgRes);
       setLeagues(lgBody.leagues);
       if (lgBody.leagues.length === 0) {
         setError("No dynasty leagues found for this user in the current or previous NFL season.");
@@ -80,8 +81,7 @@ export function useSleeperConnect(options: UseSleeperConnectOptions = {}) {
     setSelectedRosterId("");
     try {
       const res = await fetch(`/api/sleeper/league-teams?league_id=${encodeURIComponent(id)}`);
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+      const body = await parseJsonResponse<{ teams: SleeperTeamOption[] }>(res);
       setTeams(body.teams);
       if (body.teams.length === 1) {
         setSelectedRosterId(String(body.teams[0].roster_id));

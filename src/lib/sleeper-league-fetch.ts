@@ -15,14 +15,24 @@ import type {
 const LEAGUE_REVALIDATE_SECONDS = 600;
 
 async function sleeperGet<T>(url: string): Promise<{ ok: true; data: T } | { ok: false; status: number; body: string }> {
-  const res = await fetch(url, {
-    next: { revalidate: LEAGUE_REVALIDATE_SECONDS },
-    headers: { Accept: "application/json" },
-  });
-  if (!res.ok) {
-    return { ok: false, status: res.status, body: await res.text().catch(() => "") };
+  try {
+    const res = await fetch(url, {
+      next: { revalidate: LEAGUE_REVALIDATE_SECONDS },
+      headers: { Accept: "application/json" },
+    });
+    if (!res.ok) {
+      return { ok: false, status: res.status, body: await res.text().catch(() => "") };
+    }
+    const text = await res.text();
+    try {
+      return { ok: true, data: JSON.parse(text) as T };
+    } catch {
+      return { ok: false, status: 502, body: text.slice(0, 300) || "Invalid JSON from Sleeper" };
+    }
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Sleeper request failed";
+    return { ok: false, status: 502, body: message };
   }
-  return { ok: true, data: (await res.json()) as T };
 }
 
 export function sleeperUserUrl(usernameOrId: string): string {

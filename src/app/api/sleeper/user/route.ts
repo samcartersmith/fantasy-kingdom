@@ -7,19 +7,27 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "username is required" }, { status: 400 });
   }
 
-  const result = await fetchSleeperUser(username);
-  if (!result.ok) {
-    return NextResponse.json(
-      { error: result.status === 404 ? "Sleeper user not found" : "Sleeper API error", details: result.body.slice(0, 300) },
-      { status: result.status === 404 ? 404 : 502 },
-    );
-  }
+  try {
+    const result = await fetchSleeperUser(username);
+    if (!result.ok) {
+      return NextResponse.json(
+        {
+          error: result.status === 404 ? "Sleeper user not found" : "Sleeper API error",
+          details: result.body.slice(0, 300),
+        },
+        { status: result.status === 404 ? 404 : 502 },
+      );
+    }
 
-  return NextResponse.json({
-    user: {
-      user_id: result.data.user_id,
-      username: result.data.username,
-      display_name: result.data.display_name,
-    },
-  });
+    return NextResponse.json({
+      user: {
+        user_id: result.data.user_id,
+        username: result.data.username,
+        display_name: result.data.display_name,
+      },
+    });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Failed to look up Sleeper user";
+    return NextResponse.json({ error: message }, { status: 502 });
+  }
 }

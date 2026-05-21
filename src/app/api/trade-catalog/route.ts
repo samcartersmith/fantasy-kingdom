@@ -118,7 +118,7 @@ export async function GET(request: NextRequest) {
         league,
         fp,
         nflDraftRoundBySleeperId,
-      );
+      ).assets;
       picks = applyPickFairTradeModel(picks, providers);
       meta = {
         pickCount: picks.length,

@@ -1,15 +1,11 @@
 "use client";
 
+import { formatVsSlotRatio, vsSlotRatioMeetsBar } from "@/components/draft-experts/format-vs-slot";
 import type { DraftExpertsPickRow } from "@/lib/draft-experts-build";
 
 type Props = {
   picks: DraftExpertsPickRow[];
 };
-
-function formatDelta(delta: number): string {
-  const sign = delta > 0 ? "+" : "";
-  return `${sign}${delta.toLocaleString()}`;
-}
 
 export function DraftBoardTable({ picks }: Props) {
   if (picks.length === 0) {
@@ -22,7 +18,7 @@ export function DraftBoardTable({ picks }: Props) {
 
   return (
     <div className="dash-scrollbar overflow-x-auto overscroll-contain -mx-1 px-1">
-      <table className="w-full min-w-[40rem] text-sm border-collapse">
+      <table className="w-full min-w-[44rem] text-sm border-collapse">
         <thead>
           <tr className="border-b border-white/15 text-left">
             <th className="py-2 pr-3 font-semibold text-xs uppercase tracking-wide text-dash-text/65">
@@ -41,7 +37,10 @@ export function DraftBoardTable({ picks }: Props) {
               Pos
             </th>
             <th className="py-2 pr-3 font-semibold text-xs uppercase tracking-wide text-dash-text/65 text-right">
-              Value
+              Pick pts
+            </th>
+            <th className="py-2 pr-3 font-semibold text-xs uppercase tracking-wide text-dash-text/65 text-right">
+              Trade pts
             </th>
             <th className="py-2 font-semibold text-xs uppercase tracking-wide text-dash-text/65 text-right">
               vs slot
@@ -61,12 +60,19 @@ export function DraftBoardTable({ picks }: Props) {
                 {row.playerName}
               </td>
               <td className="py-2.5 pr-3 text-dash-text/75">{row.position}</td>
+              <td className="py-2.5 pr-3 tabular-nums text-dash-text/80 text-right">
+                {row.slotPoints.toLocaleString()}
+              </td>
               <td className="py-2.5 pr-3 tabular-nums text-dash-text text-right">
                 {row.currentValue.toLocaleString()}
               </td>
-              <td className="py-2.5 tabular-nums text-right font-medium text-dash-text">
-                <span className={row.delta >= 0 ? "text-dash-primary" : "text-dash-text/75"}>
-                  {formatDelta(row.delta)}
+              <td className="py-2.5 tabular-nums text-right font-medium">
+                <span
+                  className={
+                    vsSlotRatioMeetsBar(row.vsSlotRatio) ? "text-dash-primary" : "text-dash-text/75"
+                  }
+                >
+                  {formatVsSlotRatio(row.vsSlotRatio)}
                 </span>
               </td>
             </tr>

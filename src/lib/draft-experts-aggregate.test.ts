@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { expectedSlotPoints } from "@/lib/draft-slot-value";
 import {
   buildManagerEffectiveness,
   buildSteals,
-  expectedValueAtPickNo,
   isStartupDraft,
   selectAnnualDraftForSeason,
 } from "@/lib/draft-experts-aggregate";
@@ -57,16 +57,16 @@ describe("selectAnnualDraftForSeason", () => {
   });
 });
 
-describe("expectedValueAtPickNo", () => {
-  it("decays from early picks to late picks", () => {
-    const early = expectedValueAtPickNo(1, 12);
-    const late = expectedValueAtPickNo(48, 12);
+describe("slot curve via enrich pipeline fields", () => {
+  it("decays from pick 1 to pick 48 on 10k pool", () => {
+    const early = expectedSlotPoints(1, 1, 12, 4);
+    const late = expectedSlotPoints(48, 4, 12, 4);
     expect(early).toBeGreaterThan(late);
   });
 });
 
 describe("buildManagerEffectiveness and steals", () => {
-  it("ranks managers by average delta", () => {
+  it("ranks managers by average vs-slot ratio", () => {
     const picks = [
       {
         pick_no: 1,
@@ -79,8 +79,9 @@ describe("buildManagerEffectiveness and steals", () => {
         season: "2023",
         draft_id: "d",
         currentValue: 5000,
-        expectedValue: 4000,
-        delta: 1000,
+        slotPoints: 400,
+        vsSlotRatio: 1.5,
+        vsSlotExcess: 0.5,
       },
       {
         pick_no: 2,
@@ -93,8 +94,9 @@ describe("buildManagerEffectiveness and steals", () => {
         season: "2023",
         draft_id: "d",
         currentValue: 4500,
-        expectedValue: 3900,
-        delta: 600,
+        slotPoints: 350,
+        vsSlotRatio: 1.3,
+        vsSlotExcess: 0.3,
       },
       {
         pick_no: 6,
@@ -107,8 +109,9 @@ describe("buildManagerEffectiveness and steals", () => {
         season: "2023",
         draft_id: "d",
         currentValue: 4200,
-        expectedValue: 3600,
-        delta: 600,
+        slotPoints: 200,
+        vsSlotRatio: 1.2,
+        vsSlotExcess: 0.2,
       },
       {
         pick_no: 3,
@@ -121,8 +124,9 @@ describe("buildManagerEffectiveness and steals", () => {
         season: "2023",
         draft_id: "d",
         currentValue: 2000,
-        expectedValue: 3800,
-        delta: -1800,
+        slotPoints: 380,
+        vsSlotRatio: 0.6,
+        vsSlotExcess: -0.4,
       },
       {
         pick_no: 4,
@@ -135,8 +139,9 @@ describe("buildManagerEffectiveness and steals", () => {
         season: "2023",
         draft_id: "d",
         currentValue: 2100,
-        expectedValue: 3700,
-        delta: -1600,
+        slotPoints: 360,
+        vsSlotRatio: 0.65,
+        vsSlotExcess: -0.35,
       },
       {
         pick_no: 5,
@@ -149,8 +154,9 @@ describe("buildManagerEffectiveness and steals", () => {
         season: "2023",
         draft_id: "d",
         currentValue: 3000,
-        expectedValue: 3500,
-        delta: -500,
+        slotPoints: 220,
+        vsSlotRatio: 0.9,
+        vsSlotExcess: -0.1,
       },
     ];
     const names = new Map([
@@ -161,6 +167,6 @@ describe("buildManagerEffectiveness and steals", () => {
     expect(eff[0]?.roster_id).toBe(1);
     expect(eff[1]?.roster_id).toBe(2);
     const steals = buildSteals(picks);
-    expect(steals[0]?.delta).toBeGreaterThan(0);
+    expect(steals[0]?.vsSlotRatio).toBeGreaterThanOrEqual(1.15);
   });
 });
