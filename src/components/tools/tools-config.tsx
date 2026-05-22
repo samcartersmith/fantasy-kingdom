@@ -1,9 +1,12 @@
 import type { ReactNode } from "react";
 import {
+  ContenderCurveIcon,
   DraftExpertsIcon,
+  FantasyMockDraftIcon,
   LeagueDataWizardIcon,
   NewsRoomIcon,
   RankingsIcon,
+  SeasonPredictionsIcon,
   TeamEvaluationIcon,
   TradeCalculatorIcon,
 } from "@/components/tools/tool-icons";
@@ -62,9 +65,33 @@ export const TOOLS: ToolEntry[] = [
   {
     id: "news-room",
     title: "News room",
-    blurb: "Curated dynasty headlines and roster-relevant updates (coming soon).",
+    blurb: "Curated dynasty headlines, Sleeper momentum, and league signals.",
     href: "/news-room",
-    available: false,
+    available: true,
     icon: <NewsRoomIcon />,
+  },
+  {
+    id: "fantasy-mock-draft",
+    title: "Fantasy mock draft",
+    blurb: "Live mock drafts with dynasty settings and instant trade-value context.",
+    href: "/fantasy-mock-draft",
+    available: false,
+    icon: <FantasyMockDraftIcon />,
+  },
+  {
+    id: "season-predictions",
+    title: "Season predictions",
+    blurb: "Win totals, playoff odds, and roster trajectory before the season starts.",
+    href: "/season-predictions",
+    available: false,
+    icon: <SeasonPredictionsIcon />,
+  },
+  {
+    id: "contender-curve",
+    title: "The contender curve",
+    blurb: "See when your roster peaks and how to time win-now versus rebuild moves.",
+    href: "/contender-curve",
+    available: false,
+    icon: <ContenderCurveIcon />,
   },
 ];
