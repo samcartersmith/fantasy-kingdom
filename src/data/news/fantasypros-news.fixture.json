@@ -1,0 +1,52 @@
+{
+  "sport": "NFL",
+  "title": "Fantasy Player News",
+  "description": "Fixture feed for local dev when FANTASYPROS_API_KEY is unset",
+  "count": 4,
+  "items": [
+    {
+      "id": 900001,
+      "created": "2026-05-22 14:00:00",
+      "created_formated": "Thu, May 22nd 2:00pm UTC",
+      "team_id": "SF",
+      "title": "Christian McCaffrey limited in practice",
+      "sport_id": "NFL",
+      "category": "injury",
+      "link": "https://www.fantasypros.com/nfl/news/900001/christian-mccaffrey-limited-practice.php",
+      "desc": "McCaffrey was a limited participant Thursday. Monitor status before Sunday.<br><a href=\"https://www.fantasypros.com/nfl/news/900001/christian-mccaffrey-limited-practice.php\" target=\"_blank\"><small>view fantasy impact »</small></a>"
+    },
+    {
+      "id": 900002,
+      "created": "2026-05-22 12:30:00",
+      "created_formated": "Thu, May 22nd 12:30pm UTC",
+      "team_id": "DET",
+      "title": "Amon-Ra St. Brown expected to play Week 1",
+      "sport_id": "NFL",
+      "category": "breaking",
+      "link": "https://www.fantasypros.com/nfl/news/900002/amon-ra-st-brown-expected-week-1.php",
+      "desc": "St. Brown told reporters he expects to be full go for the opener."
+    },
+    {
+      "id": 900003,
+      "created": "2026-05-22 10:15:00",
+      "created_formated": "Thu, May 22nd 10:15am UTC",
+      "team_id": "ATL",
+      "title": "Bijan Robinson drawing heavy camp buzz",
+      "sport_id": "NFL",
+      "category": "rumor",
+      "link": "https://www.fantasypros.com/nfl/news/900003/bijan-robinson-camp-buzz.php",
+      "desc": "Reports from Falcons camp suggest an expanded passing-game role for Robinson."
+    },
+    {
+      "id": 900004,
+      "created": "2026-05-21 18:00:00",
+      "created_formated": "Wed, May 21st 6:00pm UTC",
+      "team_id": "CIN",
+      "title": "Ja'Marr Chase signs extension",
+      "sport_id": "NFL",
+      "category": "transaction",
+      "link": "https://www.fantasypros.com/nfl/news/900004/jamarr-chase-extension.php",
+      "desc": "Chase agreed to a four-year extension, removing offseason holdout risk for fantasy managers."
+    }
+  ]
+}

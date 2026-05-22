@@ -27,7 +27,11 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). Tools: [`/trade`](http://localhost:3000/trade), [`/rankings`](http://localhost:3000/rankings).
+Open [http://localhost:3000](http://localhost:3000). Tools: [`/trade`](http://localhost:3000/trade), [`/rankings`](http://localhost:3000/rankings), [`/news-room`](http://localhost:3000/news-room).
+
+### News room
+
+Aggregates FantasyPros headlines (API key or local fixture), Sleeper trending add/drop, and optional Yahoo league signals. Copy [`.env.example`](.env.example) to `.env.local` and set `FANTASYPROS_API_KEY` / `CRON_SECRET` when ready. First visit to `/news-room` triggers ingest if the store is empty; scheduled sync uses `POST /api/cron/news-ingest` (hourly on Vercel). Local manual run: start dev server, then `npm run news:ingest`.
 
 Fantasy production snapshot: `npm run data:fantasy` (nflverse CSVs + Sleeper id join). Optional Sleeper-only rollup for comparison: `npm run data:fantasy:sleeper` then `npm run data:fantasy:diff` (see [`docs/nflverse-scoring-parity.md`](docs/nflverse-scoring-parity.md)).
 

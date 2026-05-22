@@ -37,5 +37,8 @@ yarn-error.log*
 # vercel
 .vercel
 
+# runtime news store (ingest writes here)
+.data/
+
 # typescript
 *.tsbuildinfo

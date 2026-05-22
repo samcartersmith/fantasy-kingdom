@@ -10,9 +10,21 @@ export const SLEEPER_PLAYERS_REVALIDATE_SECONDS = 86_400;
 export const SLEEPER_TRENDING_REVALIDATE_SECONDS = 3_600;
 
 export function sleeperTrendingAddsUrl(limit: number, lookbackHours: number): string {
+  return sleeperTrendingUrl("add", limit, lookbackHours);
+}
+
+export function sleeperTrendingDropsUrl(limit: number, lookbackHours: number): string {
+  return sleeperTrendingUrl("drop", limit, lookbackHours);
+}
+
+/** News ingest: short lookback for momentum signals. */
+export const NEWS_TRENDING_LOOKBACK_HOURS = 1;
+export const NEWS_TRENDING_LIMIT = 25;
+
+function sleeperTrendingUrl(type: "add" | "drop", limit: number, lookbackHours: number): string {
   const q = new URLSearchParams({
     limit: String(limit),
     lookback_hours: String(lookbackHours),
   });
-  return `${SLEEPER_API_V1_BASE}/players/nfl/trending/add?${q.toString()}`;
+  return `${SLEEPER_API_V1_BASE}/players/nfl/trending/${type}?${q.toString()}`;
 }
