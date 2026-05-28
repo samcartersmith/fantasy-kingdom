@@ -140,34 +140,61 @@ function bestBenchPlayerForSlot(
   return bestId;
 }
 
-/**
- * Fast lineup: slot-aligned Sleeper starters, fill empty slots, one-pass upgrade if starter projects below threshold.
- */
-export function pragmaticProjectedLineupScore(
+export function slotLabel(slot: LineupSlot): string {
+  switch (slot.kind) {
+    case "QB":
+      return "QB";
+    case "RB":
+      return "RB";
+    case "WR":
+      return "WR";
+    case "TE":
+      return "TE";
+    case "FLEX":
+      return "FLEX";
+    case "WRRB_FLEX":
+      return "W/R";
+    case "REC_FLEX":
+      return "REC";
+    case "SUPER_FLEX":
+      return "SF";
+    case "K":
+      return "K";
+    case "DEF":
+      return "DEF";
+    case "IDP":
+      return "IDP";
+    default:
+      return "—";
+  }
+}
+
+export type LineupAssignment = {
+  slot: LineupSlot;
+  playerId: string | null;
+};
+
+function runPragmaticAssignments(
   rosterPositions: string[] | null | undefined,
   slotStarters: (string | null)[] | null | undefined,
   rosterPlayers: string[] | null | undefined,
   projections: Map<string, number>,
   positionLookup: Map<string, SkillPosition[]>,
-  rawPositionLookup: Map<string, string | null> = new Map(),
-): number {
+  rawPositionLookup: Map<string, string | null>,
+): LineupAssignment[] {
   const aligned = zipSlotAlignedStarters(rosterPositions, slotStarters);
-  if (!aligned.length) return 0;
+  if (!aligned.length) return [];
 
   const pool = (rosterPlayers ?? []).filter((id): id is string => Boolean(id));
   const used = new Set<string>();
-  const assignments: { slot: LineupSlot; playerId: string | null }[] = aligned.map(
-    ({ slot, playerId }) => ({ slot, playerId }),
-  );
+  const assignments: LineupAssignment[] = aligned.map(({ slot, playerId }) => ({ slot, playerId }));
 
-  // Bye/out: zero weekly projection → treat as empty so bench/optimal swaps can fill the slot.
   for (const assignment of assignments) {
     if (!assignment.playerId) continue;
     const pts = projections.get(assignment.playerId) ?? 0;
     if (pts <= 0) assignment.playerId = null;
   }
 
-  // Honor Sleeper's slot list, but only count legal, unique starters (illegal/duplicate → empty slot).
   for (const assignment of assignments) {
     if (!assignment.playerId) continue;
     const player = toLineupPlayer(
@@ -222,6 +249,127 @@ export function pragmaticProjectedLineupScore(
     }
   }
 
+  return assignments;
+}
+
+/** Slot-aligned pragmatic lineup (Sleeper starters + fill/upgrade pass). */
+export function pragmaticProjectedLineupAssignments(
+  rosterPositions: string[] | null | undefined,
+  slotStarters: (string | null)[] | null | undefined,
+  rosterPlayers: string[] | null | undefined,
+  projections: Map<string, number>,
+  positionLookup: Map<string, SkillPosition[]>,
+  rawPositionLookup: Map<string, string | null> = new Map(),
+): LineupAssignment[] {
+  return runPragmaticAssignments(
+    rosterPositions,
+    slotStarters,
+    rosterPlayers,
+    projections,
+    positionLookup,
+    rawPositionLookup,
+  );
+}
+
+function assignLineupDfsWithPath(
+  slots: LineupSlot[],
+  players: LineupPlayer[],
+  slotIndex: number,
+  used: Set<string>,
+  current: LineupAssignment[],
+): { score: number; assignments: LineupAssignment[] } {
+  if (slotIndex >= slots.length) {
+    const score = current.reduce(
+      (sum, a) => sum + (a.playerId ? (players.find((p) => p.playerId === a.playerId)?.points ?? 0) : 0),
+      0,
+    );
+    return { score, assignments: current };
+  }
+
+  const slot = slots[slotIndex]!;
+  let best = assignLineupDfsWithPath(slots, players, slotIndex + 1, used, [
+    ...current,
+    { slot, playerId: null },
+  ]);
+
+  const candidates = players
+    .filter((p) => !used.has(p.playerId) && playerEligibleForSlot(p, slot))
+    .sort((a, b) => b.points - a.points);
+
+  for (const p of candidates) {
+    used.add(p.playerId);
+    const result = assignLineupDfsWithPath(slots, players, slotIndex + 1, used, [
+      ...current,
+      { slot, playerId: p.playerId },
+    ]);
+    if (result.score > best.score) best = result;
+    used.delete(p.playerId);
+  }
+
+  return best;
+}
+
+/** Max-projection legal starting lineup assignments (same order as `startingSlots`). */
+export function optimizeProjectedLineupAssignments(
+  rosterPlayerIds: string[] | null | undefined,
+  projections: Map<string, number>,
+  startingSlots: LineupSlot[],
+  positionLookup: Map<string, SkillPosition[]>,
+  rawPositionLookup: Map<string, string | null> = new Map(),
+): LineupAssignment[] {
+  if (!startingSlots.length) return [];
+
+  const players = buildLineupPlayers(
+    rosterPlayerIds,
+    projections,
+    positionLookup,
+    rawPositionLookup,
+  );
+  if (!players.length) {
+    return startingSlots.map((slot) => ({ slot, playerId: null }));
+  }
+
+  const indexed = startingSlots.map((slot, index) => ({ slot, index }));
+  const ordered = [...indexed].sort((a, b) => slotSortKey(a.slot) - slotSortKey(b.slot));
+
+  const { assignments: orderedAssignments } = assignLineupDfsWithPath(
+    ordered.map((o) => o.slot),
+    players,
+    0,
+    new Set(),
+    [],
+  );
+
+  const result: LineupAssignment[] = startingSlots.map((slot) => ({ slot, playerId: null }));
+  for (let i = 0; i < ordered.length; i++) {
+    const originalIndex = ordered[i]!.index;
+    result[originalIndex] = orderedAssignments[i] ?? {
+      slot: startingSlots[originalIndex]!,
+      playerId: null,
+    };
+  }
+  return result;
+}
+
+/**
+ * Fast lineup: slot-aligned Sleeper starters, fill empty slots, one-pass upgrade if starter projects below threshold.
+ */
+export function pragmaticProjectedLineupScore(
+  rosterPositions: string[] | null | undefined,
+  slotStarters: (string | null)[] | null | undefined,
+  rosterPlayers: string[] | null | undefined,
+  projections: Map<string, number>,
+  positionLookup: Map<string, SkillPosition[]>,
+  rawPositionLookup: Map<string, string | null> = new Map(),
+): number {
+  const assignments = runPragmaticAssignments(
+    rosterPositions,
+    slotStarters,
+    rosterPlayers,
+    projections,
+    positionLookup,
+    rawPositionLookup,
+  );
   let total = 0;
   for (const { playerId } of assignments) {
     if (playerId) total += projections.get(playerId) ?? 0;
