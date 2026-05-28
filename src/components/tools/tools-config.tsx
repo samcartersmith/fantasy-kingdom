@@ -2,8 +2,8 @@ import type { ReactNode } from "react";
 import {
   ContenderCurveIcon,
   DraftExpertsIcon,
-  FantasyMockDraftIcon,
   LeagueDataWizardIcon,
+  MatchupAdviceIcon,
   NewsRoomIcon,
   RankingsIcon,
   SeasonPredictionsIcon,
@@ -71,12 +71,12 @@ export const TOOLS: ToolEntry[] = [
     icon: <NewsRoomIcon />,
   },
   {
-    id: "fantasy-mock-draft",
-    title: "Fantasy mock draft",
-    blurb: "Live mock drafts with dynasty settings and instant trade-value context.",
-    href: "/fantasy-mock-draft",
+    id: "matchup-advice",
+    title: "Matchup advice",
+    blurb: "Weekly start/sit calls, lineup leverage, and opponent edges before Sleeper lock.",
+    href: "/matchup-advice",
     available: false,
-    icon: <FantasyMockDraftIcon />,
+    icon: <MatchupAdviceIcon />,
   },
   {
     id: "season-predictions",
