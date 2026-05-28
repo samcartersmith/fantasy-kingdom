@@ -8,10 +8,8 @@ import {
   rosterWeekScore,
   rosterWeekUsesActuals,
 } from "@/lib/season-predictions/scoring";
-import {
-  sumRosterProjectionPoints,
-  starterPlayerIds,
-} from "@/lib/season-predictions/fetch-sleeper-projections";
+import { parseStartingSlots } from "@/lib/season-predictions/lineup-optimizer";
+import { starterPlayerIds } from "@/lib/season-predictions/fetch-sleeper-projections";
 import type { SleeperMatchup } from "@/lib/sleeper-league-types";
 
 describe("hasRecordedMatchupScore", () => {
@@ -62,11 +60,48 @@ describe("rosterWeekScore", () => {
     expect(result.score).toBe(125.4);
   });
 
-  it("sums starter projections when week is in the future", () => {
+  it("uses pragmatic lineup when mode is pragmatic", () => {
+    const projections = new Map([
+      ["qb", 20],
+      ["weak", 4],
+      ["star", 17],
+      ["wr", 12],
+    ]);
+    const positionLookup = new Map([
+      ["qb", ["QB"] as const],
+      ["weak", ["RB"] as const],
+      ["star", ["RB"] as const],
+      ["wr", ["WR"] as const],
+    ]);
+    const result = rosterWeekScore(
+      10,
+      8,
+      { roster_id: 1, matchup_id: 1, points: 0 },
+      ["qb", "weak", "wr"],
+      ["qb", "weak", "star", "wr"],
+      projections,
+      {
+        lineupMode: "pragmatic",
+        rosterPositions: ["QB", "RB", "WR"],
+        startingSlots: parseStartingSlots(["QB", "RB", "WR"]),
+        positionLookup,
+        rawPositionLookup: new Map(),
+      },
+    );
+    expect(result.usedActuals).toBe(false);
+    expect(result.score).toBe(20 + 17 + 12);
+  });
+
+  it("uses optimal lineup when mode is optimal", () => {
     const projections = new Map([
       ["p1", 12.5],
       ["p2", 8],
       ["p3", 15],
+    ]);
+    const positionLookup = new Map([
+      ["p1", ["WR"] as const],
+      ["p2", ["WR"] as const],
+      ["p3", ["RB"] as const],
     ]);
     const result = rosterWeekScore(
       10,
@@ -75,18 +110,17 @@ describe("rosterWeekScore", () => {
       null,
       ["p1", "p2", "p3"],
       projections,
+      {
+        lineupMode: "optimal",
+        rosterPositions: ["QB", "RB", "WR", "FLEX"],
+        startingSlots: parseStartingSlots(["QB", "RB", "WR", "FLEX"]),
+        positionLookup,
+        rawPositionLookup: new Map(),
+      },
     );
     expect(result.usedActuals).toBe(false);
-    expect(result.score).toBe(20.5);
+    expect(result.score).toBe(35.5);
   });
-});
-
-describe("sumRosterProjectionPoints", () => {
-  it("ignores missing players", () => {
-    const map = new Map([["a", 10]]);
-    expect(sumRosterProjectionPoints(["a", "b"], map)).toBe(10);
-  });
-
 });
 
 describe("starterPlayerIds", () => {

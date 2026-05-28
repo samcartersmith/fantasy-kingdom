@@ -19,9 +19,9 @@ export default function SeasonPredictionsPage() {
               Season predictions
             </h1>
             <p className="text-sm sm:text-base text-dash-text/75 leading-relaxed max-w-xl">
-              Connect Sleeper and simulate the regular season: each matchup compares Sleeper&apos;s
-              suggested starter projections week by week (actual scores for completed weeks). See
-              projected standings and week-by-week winners.
+              Connect Sleeper and simulate the regular season. We use league rosters and Sleeper
+              weekly projections only—no bulk player database. Default mode adjusts your listed
+              starters; optional optimal mode picks the best lineup from starters and bench.
             </p>
           </header>
         ) : null}
