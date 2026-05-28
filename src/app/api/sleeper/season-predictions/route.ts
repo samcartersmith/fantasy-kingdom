@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { buildSeasonPredictionsPayload } from "@/lib/season-predictions/build-payload";
+import {
+  buildSeasonPredictionsPayload,
+  parseLineupMode,
+} from "@/lib/season-predictions/build-payload";
 
 export const maxDuration = 120;
 
@@ -9,8 +12,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "league_id is required" }, { status: 400 });
   }
 
+  const lineupMode = parseLineupMode(request.nextUrl.searchParams.get("lineup_mode"));
+
   try {
-    const payload = await buildSeasonPredictionsPayload(leagueId);
+    const payload = await buildSeasonPredictionsPayload(leagueId, { lineupMode });
     if (!payload) {
       return NextResponse.json({ error: "League or roster data not found" }, { status: 404 });
     }

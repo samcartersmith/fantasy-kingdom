@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { LeagueIdHint } from "@/components/season-predictions/LeagueIdHint";
 import type {
   SeasonPredictionRow,
   SeasonPredictionSortKey,
@@ -85,6 +86,7 @@ export function SeasonPredictionsTable({
             {data.meta.leagueContextLabel} · {data.league.season} · Week {data.meta.currentWeek} of{" "}
             {data.meta.regularSeasonWeeks}
           </p>
+          <LeagueIdHint leagueId={data.league.league_id} />
           <p className="text-xs text-dash-text/55 leading-relaxed max-w-2xl">{data.meta.valueNote}</p>
         </div>
         <div className="flex flex-wrap gap-2 shrink-0">

@@ -1,25 +1,135 @@
 import { describe, expect, it } from "vitest";
-import { fetchSleeperWeeklyProjections } from "@/lib/season-predictions/fetch-sleeper-projections";
+import {
+  clearProjectionWeekCacheForTests,
+  fetchProjectionWeeksParallel,
+  fetchSleeperWeeklyProjections,
+  fetchSleeperWeeklyProjectionsWithHints,
+} from "@/lib/season-predictions/fetch-sleeper-projections";
+import { skillPositionsFromProjectionRow } from "@/lib/season-predictions/player-positions";
+
+describe("skillPositionsFromProjectionRow", () => {
+  it("reads fantasy_positions and position from projection rows", () => {
+    expect(
+      skillPositionsFromProjectionRow({
+        player_id: "1",
+        position: "RB",
+        fantasy_positions: ["RB", "WR"],
+      }),
+    ).toEqual(["RB", "WR"]);
+  });
+});
 
 describe("fetchSleeperWeeklyProjections", () => {
   it("parses pts from nested stats on projection rows", async () => {
+    const originalFetch = globalThis.fetch;
+    let fetchInit: RequestInit | undefined;
+    globalThis.fetch = async (_input, init) => {
+      fetchInit = init;
+      return new Response(
+        JSON.stringify([
+          {
+            player_id: "4984",
+            position: "QB",
+            stats: { pts_half_ppr: 23.79, pts_ppr: 24.1, pts_std: 20.1 },
+          },
+        ]),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    };
+
+    try {
+      clearProjectionWeekCacheForTests();
+      const map = await fetchSleeperWeeklyProjections("2026", 1, 0.5);
+      expect(map.get("4984")).toBeCloseTo(23.79, 2);
+      expect(fetchInit?.cache).toBe("no-store");
+    } finally {
+      globalThis.fetch = originalFetch;
+      clearProjectionWeekCacheForTests();
+    }
+  });
+
+  it("filters to relevant player ids when provided", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async () =>
+      new Response(
+        JSON.stringify([
+          { player_id: "a", stats: { pts_ppr: 10 } },
+          { player_id: "b", stats: { pts_ppr: 20 } },
+        ]),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+
+    try {
+      clearProjectionWeekCacheForTests();
+      const result = await fetchSleeperWeeklyProjectionsWithHints("2026", 3, 1, new Set(["a"]));
+      expect(result.projections.get("a")).toBe(10);
+      expect(result.projections.has("b")).toBe(false);
+    } finally {
+      globalThis.fetch = originalFetch;
+      clearProjectionWeekCacheForTests();
+    }
+  });
+});
+
+describe("fetchSleeperWeeklyProjectionsWithHints", () => {
+  it("returns position hints alongside projections", async () => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = async () =>
       new Response(
         JSON.stringify([
           {
-            player_id: "4984",
-            stats: { pts_half_ppr: 23.79, pts_ppr: 24.1, pts_std: 20.1 },
+            player_id: "99",
+            position: "TE",
+            fantasy_positions: ["TE"],
+            stats: { pts_ppr: 8.2 },
           },
         ]),
         { status: 200, headers: { "Content-Type": "application/json" } },
       );
 
     try {
-      const map = await fetchSleeperWeeklyProjections("2026", 1, 0.5);
-      expect(map.get("4984")).toBeCloseTo(23.79, 2);
+      const result = await fetchSleeperWeeklyProjectionsWithHints("2026", 2, 1);
+      expect(result.projections.get("99")).toBeCloseTo(8.2, 1);
+      expect(result.positionHints.get("99")).toEqual(["TE"]);
+      expect(result.rawPositionHints.get("99")).toBe("TE");
     } finally {
       globalThis.fetch = originalFetch;
+    }
+  });
+});
+
+describe("fetchProjectionWeeksParallel", () => {
+  it("fetches multiple weeks with bounded concurrency", async () => {
+    const originalFetch = globalThis.fetch;
+    const calls: number[] = [];
+
+    globalThis.fetch = async (input) => {
+      const url = String(input);
+      const match = url.match(/\/(\d+)\?/);
+      const week = match ? Number(match[1]) : 0;
+      calls.push(week);
+      return new Response(
+        JSON.stringify([
+          {
+            player_id: String(week),
+            position: "RB",
+            stats: { pts_ppr: week },
+          },
+        ]),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    };
+
+    try {
+      clearProjectionWeekCacheForTests();
+      const result = await fetchProjectionWeeksParallel([1, 2, 3], "2026", 1, 2);
+      expect(result.byWeek.get(1)?.get("1")).toBe(1);
+      expect(result.byWeek.get(2)?.get("2")).toBe(2);
+      expect(result.byWeek.get(3)?.get("3")).toBe(3);
+      expect(calls.sort((a, b) => a - b)).toEqual([1, 2, 3]);
+    } finally {
+      globalThis.fetch = originalFetch;
+      clearProjectionWeekCacheForTests();
     }
   });
 });

@@ -1,4 +1,8 @@
-export const SEASON_PREDICTIONS_METHODOLOGY_VERSION = "sp-v1-sleeper-sum";
+export type { SeasonPredictionsLineupMode } from "@/lib/season-predictions/lineup-mode";
+export {
+  METHODOLOGY_OPTIMAL,
+  METHODOLOGY_PRAGMATIC,
+} from "@/lib/season-predictions/lineup-mode";
 
 export type SeasonPredictionSortKey =
   | "rank"
@@ -34,6 +38,7 @@ export type SeasonPredictionMatchup = {
 
 export type SeasonPredictionsMeta = {
   methodologyVersion: string;
+  lineupMode: "pragmatic" | "optimal";
   leagueContextLabel: string;
   season: string;
   currentWeek: number;

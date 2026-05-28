@@ -1,9 +1,20 @@
 import { effectiveMatchupPoints } from "@/lib/league-history-aggregate";
+import type { SeasonPredictionsLineupMode } from "@/lib/season-predictions/lineup-mode";
 import {
-  starterPlayerIds,
-  sumRosterProjectionPoints,
-} from "@/lib/season-predictions/fetch-sleeper-projections";
+  optimizeProjectedLineupScore,
+  pragmaticProjectedLineupScore,
+  type LineupSlot,
+} from "@/lib/season-predictions/lineup-optimizer";
 import type { SleeperMatchup } from "@/lib/sleeper-league-types";
+import type { SkillPosition } from "@/lib/sleeper-ranking";
+
+export type RosterWeekScoreContext = {
+  lineupMode: SeasonPredictionsLineupMode;
+  rosterPositions: string[];
+  startingSlots: LineupSlot[];
+  positionLookup: Map<string, SkillPosition[]>;
+  rawPositionLookup: Map<string, string | null>;
+};
 
 export function hasRecordedMatchupScore(m: SleeperMatchup): boolean {
   const custom = m.custom_points;
@@ -31,8 +42,9 @@ export function rosterWeekScore(
   currentWeek: number,
   matchupRow: SleeperMatchup | undefined,
   rosterStarters: string[] | null | undefined,
-  rosterPlayers: string[] | null | undefined,
+  lineupPool: string[] | null | undefined,
   projections: Map<string, number>,
+  lineupContext?: RosterWeekScoreContext,
 ): { score: number; usedActuals: boolean } {
   if (rosterWeekUsesActuals(week, currentWeek, matchupRow)) {
     return {
@@ -40,9 +52,36 @@ export function rosterWeekScore(
       usedActuals: true,
     };
   }
-  const lineup = starterPlayerIds(matchupRow, rosterStarters, rosterPlayers);
+
+  if (!lineupContext) {
+    return { score: 0, usedActuals: false };
+  }
+
+  const slotStarters = matchupRow?.starters ?? rosterStarters ?? null;
+  const pool = lineupPool?.filter(Boolean) ?? [];
+
+  if (lineupContext.lineupMode === "pragmatic") {
+    return {
+      score: pragmaticProjectedLineupScore(
+        lineupContext.rosterPositions,
+        slotStarters,
+        pool,
+        projections,
+        lineupContext.positionLookup,
+        lineupContext.rawPositionLookup,
+      ),
+      usedActuals: false,
+    };
+  }
+
   return {
-    score: sumRosterProjectionPoints(lineup, projections),
+    score: optimizeProjectedLineupScore(
+      pool,
+      projections,
+      lineupContext.startingSlots,
+      lineupContext.positionLookup,
+      lineupContext.rawPositionLookup,
+    ),
     usedActuals: false,
   };
 }

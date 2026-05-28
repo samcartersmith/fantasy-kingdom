@@ -3,8 +3,23 @@ import {
   formatLeagueContextLabel,
   leagueContextFromSleeper,
 } from "@/lib/league-context-from-sleeper";
-import { fetchSleeperWeeklyProjections } from "@/lib/season-predictions/fetch-sleeper-projections";
+import { fetchProjectionWeeksParallel } from "@/lib/season-predictions/fetch-sleeper-projections";
+import {
+  methodologyVersionForMode,
+  parseLineupMode,
+  valueNoteForMode,
+  type SeasonPredictionsLineupMode,
+} from "@/lib/season-predictions/lineup-mode";
+import { parseStartingSlots } from "@/lib/season-predictions/lineup-optimizer";
 import { fetchSleeperNflState } from "@/lib/season-predictions/nfl-state";
+import {
+  buildRosterPositionIndexFromProfile,
+  toLineupPositionLookup,
+} from "@/lib/season-predictions/player-positions";
+import {
+  activeLineupPlayerIds,
+  collectActiveLineupPlayerIds,
+} from "@/lib/season-predictions/roster-pool";
 import {
   applyHeadToHeadResult,
   emptyWeekOutcome,
@@ -12,11 +27,10 @@ import {
   rosterWeekScore,
   rosterWeekUsesActuals,
 } from "@/lib/season-predictions/scoring";
-import {
-  SEASON_PREDICTIONS_METHODOLOGY_VERSION,
-  type SeasonPredictionMatchup,
-  type SeasonPredictionRow,
-  type SeasonPredictionsPayload,
+import type {
+  SeasonPredictionMatchup,
+  SeasonPredictionRow,
+  SeasonPredictionsPayload,
 } from "@/lib/season-predictions/types";
 import {
   fetchSeasonRegularMatchups,
@@ -28,6 +42,10 @@ import {
   rosterDisplayName,
 } from "@/lib/sleeper-league-fetch";
 import type { SleeperLeagueUser, SleeperMatchup, SleeperRoster } from "@/lib/sleeper-league-types";
+
+export type BuildSeasonPredictionsOptions = {
+  lineupMode?: SeasonPredictionsLineupMode;
+};
 
 function ownerDisplayName(roster: SleeperRoster, users: SleeperLeagueUser[]): string {
   const owner = users.find((u) => u.user_id === roster.owner_id);
@@ -56,9 +74,27 @@ function weekNeedsProjections(
   return false;
 }
 
+function collectProjectionWeeks(
+  matchupsByWeek: Map<number, SleeperMatchup[]>,
+  regularSeasonWeeks: number,
+  currentWeek: number,
+  rosters: SleeperRoster[],
+): number[] {
+  const weeks: number[] = [];
+  for (let week = 1; week <= regularSeasonWeeks; week++) {
+    const rows = matchupsByWeek.get(week);
+    if (!rows?.length) continue;
+    if (weekNeedsProjections(week, currentWeek, rows, rosters)) weeks.push(week);
+  }
+  return weeks;
+}
+
 export async function buildSeasonPredictionsPayload(
   leagueId: string,
+  options: BuildSeasonPredictionsOptions = {},
 ): Promise<SeasonPredictionsPayload | null> {
+  const lineupMode = options.lineupMode ?? "pragmatic";
+
   const [league, rosters, users, nflState] = await Promise.all([
     fetchSleeperLeague(leagueId),
     fetchSleeperLeagueRosters(leagueId),
@@ -71,31 +107,53 @@ export async function buildSeasonPredictionsPayload(
   const leagueContext = leagueContextFromSleeper(league);
   const regularSeasonWeeks = regularSeasonWeekLimit(league);
   const currentWeek = Math.max(0, nflState?.week ?? 0);
-  const projectionSeason = league.season || nflState?.league_season || nflState?.season || String(new Date().getFullYear());
+  const projectionSeason =
+    league.season || nflState?.league_season || nflState?.season || String(new Date().getFullYear());
+  const startingSlots = parseStartingSlots(league.roster_positions);
+
+  const activePlayerIds = collectActiveLineupPlayerIds(rosters);
 
   const matchupsByWeek = await fetchSeasonRegularMatchups(leagueId, regularSeasonWeeks);
 
+  const projectionWeeks = collectProjectionWeeks(
+    matchupsByWeek,
+    regularSeasonWeeks,
+    currentWeek,
+    rosters,
+  );
+
+  const projectionFetch = await fetchProjectionWeeksParallel(
+    projectionWeeks,
+    projectionSeason,
+    leagueContext.ppr,
+    {
+      concurrency: 4,
+      relevantPlayerIds: activePlayerIds,
+    },
+  );
+
+  const positionIndex = buildRosterPositionIndexFromProfile(
+    activePlayerIds,
+    projectionFetch.mergedPositionHints,
+    projectionFetch.mergedRawHints,
+  );
+
+  const lineupContext = {
+    lineupMode,
+    rosterPositions: league.roster_positions ?? [],
+    startingSlots,
+    positionLookup: toLineupPositionLookup(positionIndex),
+    rawPositionLookup: positionIndex.rawPositionByPlayerId,
+  };
+
+  const projectionCache = projectionFetch.byWeek;
+  const projectionWeeksFetched = projectionWeeks.length;
+
   const startersByRoster = new Map<number, string[]>();
-  const playersByRoster = new Map<number, string[]>();
+  const lineupPoolByRoster = new Map<number, string[]>();
   for (const roster of rosters) {
     startersByRoster.set(roster.roster_id, roster.starters ?? []);
-    playersByRoster.set(roster.roster_id, roster.players ?? []);
-  }
-
-  const projectionCache = new Map<number, Map<string, number>>();
-  let projectionWeeksFetched = 0;
-
-  for (let week = 1; week <= regularSeasonWeeks; week++) {
-    const rows = matchupsByWeek.get(week);
-    if (!rows?.length) continue;
-    if (!weekNeedsProjections(week, currentWeek, rows, rosters)) continue;
-    const projections = await fetchSleeperWeeklyProjections(
-      projectionSeason,
-      week,
-      leagueContext.ppr,
-    );
-    projectionCache.set(week, projections);
-    projectionWeeksFetched += 1;
+    lineupPoolByRoster.set(roster.roster_id, activeLineupPlayerIds(roster));
   }
 
   const totals = emptyWeekOutcome();
@@ -126,16 +184,18 @@ export async function buildSeasonPredictionsPayload(
         currentWeek,
         rowA,
         startersByRoster.get(a.roster_id),
-        playersByRoster.get(a.roster_id),
+        lineupPoolByRoster.get(a.roster_id),
         projections,
+        lineupContext,
       );
       const resultB = rosterWeekScore(
         week,
         currentWeek,
         rowB,
         startersByRoster.get(b.roster_id),
-        playersByRoster.get(b.roster_id),
+        lineupPoolByRoster.get(b.roster_id),
         projections,
+        lineupContext,
       );
 
       const winnerRosterId = applyHeadToHeadResult(
@@ -187,11 +247,6 @@ export async function buildSeasonPredictionsPayload(
     return b.pointsFor - a.pointsFor;
   });
 
-  const valueNote =
-    currentWeek > 0
-      ? `Completed weeks use actual Sleeper matchup scores; remaining weeks use the sum of Sleeper weekly projections for each team's starters.`
-      : "Each matchup compares the sum of Sleeper weekly projections for each team's starters (from the scheduled lineup).";
-
   return {
     league: {
       league_id: league.league_id,
@@ -202,14 +257,17 @@ export async function buildSeasonPredictionsPayload(
     rows: tableRows,
     matchups,
     meta: {
-      methodologyVersion: SEASON_PREDICTIONS_METHODOLOGY_VERSION,
+      methodologyVersion: methodologyVersionForMode(lineupMode),
+      lineupMode,
       leagueContextLabel: formatLeagueContextLabel(leagueContext),
       season: league.season,
       currentWeek,
       regularSeasonWeeks,
-      valueNote,
+      valueNote: valueNoteForMode(lineupMode, currentWeek),
       lastUpdated: new Date().toISOString(),
       projectionWeeksFetched,
     },
   };
 }
+
+export { parseLineupMode };
