@@ -80,12 +80,14 @@ export function NewsRoomIcon() {
   );
 }
 
-export function FantasyMockDraftIcon() {
+export function MatchupAdviceIcon() {
   return (
     <svg {...iconProps}>
-      <rect x="3" y="4" width="18" height="16" rx="2" />
-      <path d="M8 8h8M8 12h6M8 16h4" />
-      <path d="M16 2v4M8 2v4" />
+      <path d="M12 3v18" />
+      <path d="M5 7h5v3H5z" />
+      <path d="M14 7h5v3h-5z" />
+      <path d="M5 13h5v4H5z" />
+      <path d="M14 13h5v4h-5z" />
     </svg>
   );
 }
