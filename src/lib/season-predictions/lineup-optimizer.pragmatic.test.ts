@@ -45,6 +45,34 @@ describe("pragmaticProjectedLineupScore", () => {
     expect(score).toBe(20 + 14 + 12 + 8);
   });
 
+  it("treats zero-projection starters as empty before filling", () => {
+    const projections = new Map([
+      ["dead_qb", 0],
+      ["dead_sflex", 0],
+      ["rb1", 12],
+      ["rb2", 9],
+      ["wr", 10],
+      ["te", 8],
+    ]);
+    const lookup = new Map<string, ("QB" | "RB" | "WR" | "TE")[]>([
+      ["dead_qb", ["QB"]],
+      ["dead_sflex", ["QB", "RB", "WR", "TE"]],
+      ["rb1", ["RB"]],
+      ["rb2", ["RB"]],
+      ["wr", ["WR"]],
+      ["te", ["TE"]],
+    ]);
+    const score = pragmaticProjectedLineupScore(
+      ["QB", "SUPER_FLEX", "RB", "WR", "TE"],
+      ["dead_qb", "dead_sflex", "rb1", "wr", "te"],
+      ["dead_qb", "dead_sflex", "rb1", "rb2", "wr", "te"],
+      projections,
+      lookup,
+    );
+    // Cleared 0-pt superflex → rb2 (9); RB stays rb1 (12); QB fill may still be 0
+    expect(score).toBe(0 + 9 + 12 + 10 + 8);
+  });
+
   it("upgrades a starter below the weak threshold", () => {
     const projections = new Map([
       ["weak", 4],

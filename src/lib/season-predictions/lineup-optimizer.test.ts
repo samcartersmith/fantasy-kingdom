@@ -140,6 +140,53 @@ describe("optimizeProjectedLineupScore", () => {
     expect(score).toBe(24 + 20 + 12 + 11 + 9);
   });
 
+  it("slots team defense ids when rawPosition is DEF", () => {
+    const projections = new Map([
+      ["qb", 18],
+      ["rb", 12],
+      ["wr", 14],
+      ["SF", 6],
+    ]);
+    const lookup = new Map<string, ("QB" | "RB" | "WR" | "TE")[]>([
+      ["qb", ["QB"]],
+      ["rb", ["RB"]],
+      ["wr", ["WR"]],
+    ]);
+    const raw = new Map<string, string | null>([["SF", "DEF"]]);
+    const score = optimizeProjectedLineupScore(
+      ["qb", "rb", "wr", "SF"],
+      projections,
+      parseStartingSlots(["QB", "RB", "WR", "DEF"]),
+      lookup,
+      raw,
+    );
+    expect(score).toBe(18 + 12 + 14 + 6);
+  });
+
+  it("ignores zero-projection players in optimal lineup", () => {
+    const projections = new Map([
+      ["qb0", 0],
+      ["qb1", 18],
+      ["rb", 12],
+      ["wr", 11],
+      ["te", 9],
+    ]);
+    const positions = new Map<string, ("QB" | "RB" | "WR" | "TE")[]>([
+      ["qb0", ["QB"]],
+      ["qb1", ["QB"]],
+      ["rb", ["RB"]],
+      ["wr", ["WR"]],
+      ["te", ["TE"]],
+    ]);
+    const score = optimizeProjectedLineupScore(
+      ["qb0", "qb1", "rb", "wr", "te"],
+      projections,
+      parseStartingSlots(["QB", "SUPER_FLEX", "RB", "WR", "TE"]),
+      positions,
+    );
+    expect(score).toBe(18 + 12 + 11 + 9);
+  });
+
   it("returns 0 when no starting slots", () => {
     expect(optimizeProjectedLineupScore(["a"], new Map([["a", 10]]), [], new Map())).toBe(
       0,

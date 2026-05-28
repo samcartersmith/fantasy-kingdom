@@ -18,7 +18,7 @@ describe("parseLineupMode", () => {
 
 describe("methodologyVersionForMode", () => {
   it("maps modes to methodology ids", () => {
-    expect(methodologyVersionForMode("pragmatic")).toBe("sp-v2-sleeper-pragmatic");
-    expect(methodologyVersionForMode("optimal")).toBe("sp-v2-sleeper-optimal");
+    expect(methodologyVersionForMode("pragmatic")).toBe("sp-v3-sleeper-pragmatic");
+    expect(methodologyVersionForMode("optimal")).toBe("sp-v3-sleeper-optimal");
   });
 });

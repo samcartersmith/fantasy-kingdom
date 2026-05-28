@@ -1,5 +1,6 @@
 import fantasyProfileJson from "@/data/trade-model/player-fantasy-profile.json";
 import type { PlayerFantasyProfile } from "@/lib/trade-model/fp-baseline";
+import { isSleeperTeamDefenseId } from "@/lib/season-predictions/projection-position-inference";
 import type { SkillPosition } from "@/lib/sleeper-ranking";
 
 const fantasyProfiles = (fantasyProfileJson as { profiles: Record<string, PlayerFantasyProfile> })
@@ -87,10 +88,20 @@ export function buildRosterPositionIndexFromProfile(
       const raw = rawFromProfile(id);
       if (raw) rawPositionByPlayerId.set(id, raw);
     }
+    if (isSleeperTeamDefenseId(id)) {
+      rawPositionByPlayerId.set(id, "DEF");
+    }
   }
 
   const index: RosterPositionIndex = { skillByPlayerId, rawPositionByPlayerId };
   if (projectionHints) mergeProjectionPositionHints(index, projectionHints, rawHints);
+
+  for (const id of playerIds) {
+    if (id && isSleeperTeamDefenseId(id)) {
+      index.rawPositionByPlayerId.set(id, "DEF");
+    }
+  }
+
   return index;
 }
 

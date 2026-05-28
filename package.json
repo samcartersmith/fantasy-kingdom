@@ -18,7 +18,8 @@
     "data:top50-breakdown:csv": "node scripts/dump-top50-breakdown.mjs --format csv",
     "data:curate:hydrate": "node scripts/hydrate-curated-from-sleeper.mjs",
     "data:calibrate": "node scripts/calibrate-vs-reference.mjs",
-    "news:ingest": "node scripts/news-ingest.mjs"
+    "news:ingest": "node scripts/news-ingest.mjs",
+    "debug:season-predictions": "npx tsx scripts/debug-season-predictions.ts"
   },
   "dependencies": {
     "d3": "^7.9.0",

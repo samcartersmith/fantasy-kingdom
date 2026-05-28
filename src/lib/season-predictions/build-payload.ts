@@ -4,6 +4,7 @@ import {
   leagueContextFromSleeper,
 } from "@/lib/league-context-from-sleeper";
 import { fetchProjectionWeeksParallel } from "@/lib/season-predictions/fetch-sleeper-projections";
+import { hasLeagueScoringSettings } from "@/lib/season-predictions/league-projection-points";
 import {
   methodologyVersionForMode,
   parseLineupMode,
@@ -122,15 +123,12 @@ export async function buildSeasonPredictionsPayload(
     rosters,
   );
 
-  const projectionFetch = await fetchProjectionWeeksParallel(
-    projectionWeeks,
-    projectionSeason,
-    leagueContext.ppr,
-    {
-      concurrency: 4,
-      relevantPlayerIds: activePlayerIds,
-    },
-  );
+  const projectionFetch = await fetchProjectionWeeksParallel(projectionWeeks, projectionSeason, {
+    concurrency: 4,
+    relevantPlayerIds: activePlayerIds,
+    scoringSettings: league.scoring_settings ?? {},
+    ppr: leagueContext.ppr,
+  });
 
   const positionIndex = buildRosterPositionIndexFromProfile(
     activePlayerIds,
@@ -266,6 +264,7 @@ export async function buildSeasonPredictionsPayload(
       valueNote: valueNoteForMode(lineupMode, currentWeek),
       lastUpdated: new Date().toISOString(),
       projectionWeeksFetched,
+      usesLeagueScoring: hasLeagueScoringSettings(league.scoring_settings),
     },
   };
 }
