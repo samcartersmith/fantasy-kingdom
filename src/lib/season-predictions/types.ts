@@ -46,6 +46,8 @@ export type SeasonPredictionsMeta = {
   valueNote: string;
   lastUpdated: string;
   projectionWeeksFetched: number;
+  /** Projected weeks are scored with league scoring_settings (not generic pts_ppr presets). */
+  usesLeagueScoring: boolean;
 };
 
 export type SeasonPredictionsPayload = {

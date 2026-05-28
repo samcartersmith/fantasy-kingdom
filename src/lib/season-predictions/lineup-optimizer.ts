@@ -160,6 +160,13 @@ export function pragmaticProjectedLineupScore(
     ({ slot, playerId }) => ({ slot, playerId }),
   );
 
+  // Bye/out: zero weekly projection → treat as empty so bench/optimal swaps can fill the slot.
+  for (const assignment of assignments) {
+    if (!assignment.playerId) continue;
+    const pts = projections.get(assignment.playerId) ?? 0;
+    if (pts <= 0) assignment.playerId = null;
+  }
+
   // Honor Sleeper's slot list, but only count legal, unique starters (illegal/duplicate → empty slot).
   for (const assignment of assignments) {
     if (!assignment.playerId) continue;
@@ -314,10 +321,10 @@ function buildLineupPlayers(
     const positions = positionLookup.get(playerId) ?? [];
     const rawPosition = rawPositionLookup.get(playerId) ?? null;
     const points = projections.get(playerId) ?? 0;
-    if (points <= 0 && positions.length === 0 && !rawPosition) continue;
+    if (points <= 0) continue;
     out.push({
       playerId,
-      points: points > 0 ? points : 0,
+      points,
       positions,
       rawPosition,
     });
