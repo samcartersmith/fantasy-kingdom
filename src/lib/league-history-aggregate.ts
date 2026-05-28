@@ -97,7 +97,7 @@ export function pairMatchups(rows: SleeperMatchup[]): MatchupPair[] {
   return pairs;
 }
 
-function effectivePoints(m: SleeperMatchup): number {
+export function effectiveMatchupPoints(m: SleeperMatchup): number {
   const custom = m.custom_points;
   if (typeof custom === "number" && Number.isFinite(custom)) return custom;
   return typeof m.points === "number" && Number.isFinite(m.points) ? m.points : 0;
@@ -115,8 +115,8 @@ export function accumulateMatchupWeek(
   nameByRoster: Map<number, string>,
 ): void {
   for (const { a, b } of pairs) {
-    const pa = effectivePoints(a);
-    const pb = effectivePoints(b);
+    const pa = effectiveMatchupPoints(a);
+    const pb = effectiveMatchupPoints(b);
     points.set(a.roster_id, (points.get(a.roster_id) ?? 0) + pa);
     points.set(b.roster_id, (points.get(b.roster_id) ?? 0) + pb);
 

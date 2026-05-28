@@ -83,7 +83,7 @@ export const TOOLS: ToolEntry[] = [
     title: "Season predictions",
     blurb: "Win totals, playoff odds, and roster trajectory before the season starts.",
     href: "/season-predictions",
-    available: false,
+    available: true,
     icon: <SeasonPredictionsIcon />,
   },
   {
