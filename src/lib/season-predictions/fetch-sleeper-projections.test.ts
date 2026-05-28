@@ -4,6 +4,7 @@ import {
   fetchProjectionWeeksParallel,
   fetchSleeperWeeklyProjections,
   fetchSleeperWeeklyProjectionsWithHints,
+  prefetchProjectionWeekRows,
 } from "@/lib/season-predictions/fetch-sleeper-projections";
 import fixtures from "@/lib/season-predictions/league-projection-points.fixtures.json";
 import { skillPositionsFromProjectionRow } from "@/lib/season-predictions/player-positions";
@@ -188,6 +189,36 @@ describe("fetchProjectionWeeksParallel", () => {
       expect(result.byWeek.get(2)?.get("2")).toBe(2);
       expect(result.byWeek.get(3)?.get("3")).toBe(3);
       expect(calls.sort((a, b) => a - b)).toEqual([1, 2, 3]);
+    } finally {
+      globalThis.fetch = originalFetch;
+      clearProjectionWeekCacheForTests();
+    }
+  });
+});
+
+describe("prefetchProjectionWeekRows", () => {
+  it("downloads each requested week once into the raw cache", async () => {
+    const originalFetch = globalThis.fetch;
+    const calls: number[] = [];
+
+    globalThis.fetch = async (input) => {
+      const url = String(input);
+      const match = url.match(/\/(\d+)\?/);
+      const week = match ? Number(match[1]) : 0;
+      calls.push(week);
+      return new Response(JSON.stringify([]), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    };
+
+    try {
+      clearProjectionWeekCacheForTests();
+      await prefetchProjectionWeekRows("2026", [4, 5, 5]);
+      expect(calls.sort((a, b) => a - b)).toEqual([4, 5]);
+      calls.length = 0;
+      await prefetchProjectionWeekRows("2026", [4, 5]);
+      expect(calls).toEqual([]);
     } finally {
       globalThis.fetch = originalFetch;
       clearProjectionWeekCacheForTests();

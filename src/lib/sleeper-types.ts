@@ -10,6 +10,7 @@ export type SleeperNflPlayer = {
   fantasy_positions?: string[] | null;
   team?: string | null;
   status?: string | null;
+  injury_status?: string | null;
   sport?: string | null;
   /** Search popularity rank when Sleeper exposes it (lower = more searched). */
   search_rank?: number | null;

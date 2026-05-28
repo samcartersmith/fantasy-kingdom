@@ -75,7 +75,7 @@ export const TOOLS: ToolEntry[] = [
     title: "Matchup advice",
     blurb: "Weekly start/sit calls, lineup leverage, and opponent edges before Sleeper lock.",
     href: "/matchup-advice",
-    available: false,
+    available: true,
     icon: <MatchupAdviceIcon />,
   },
   {

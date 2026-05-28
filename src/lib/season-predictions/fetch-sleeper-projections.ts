@@ -24,10 +24,21 @@ const PROJECTION_FETCH_INIT: RequestInit = {
 
 type ProjectionRow = Record<string, unknown>;
 
+export type ProjectionPlayerMeta = {
+  name: string;
+  position: string | null;
+  nflTeam: string | null;
+  opponent: string | null;
+  gameDate: string | null;
+  injuryBadge: string | null;
+  sleeperStatus: string | null;
+};
+
 export type WeeklyProjectionFetchResult = {
   projections: Map<string, number>;
   positionHints: Map<string, SkillPosition[]>;
   rawPositionHints: Map<string, string | null>;
+  playerMeta: Map<string, ProjectionPlayerMeta>;
 };
 
 export type ParseProjectionOptions = {
@@ -59,19 +70,74 @@ export function sleeperWeeklyProjectionsUrl(season: string, week: number): strin
   return `https://api.sleeper.com/projections/nfl/${encodeURIComponent(season)}/${week}?${q.toString()}`;
 }
 
+function projectionPlayerObject(row: ProjectionRow): Record<string, unknown> | null {
+  const player = row.player;
+  return player && typeof player === "object" ? (player as Record<string, unknown>) : null;
+}
+
+function parsePlayerMetaFromRow(row: ProjectionRow): ProjectionPlayerMeta | null {
+  const playerId = playerIdFromRow(row);
+  if (!playerId) return null;
+
+  const player = projectionPlayerObject(row);
+  const first = String(player?.first_name ?? "").trim();
+  const last = String(player?.last_name ?? "").trim();
+  const name = `${first} ${last}`.trim() || (isSleeperTeamDefenseId(playerId) ? `${playerId} DEF` : `Player ${playerId}`);
+
+  const positionRaw =
+    String(player?.position ?? row.position ?? "")
+      .trim()
+      .toUpperCase() || null;
+  const nflTeam =
+    String(player?.team ?? row.team ?? "")
+      .trim()
+      .toUpperCase() || null;
+  const opponent = row.opponent != null ? String(row.opponent).trim().toUpperCase() : null;
+  const gameDate = row.date != null ? String(row.date).trim() : null;
+  const injuryRaw = String(player?.injury_status ?? "").trim();
+  const injuryBadge = injuryRaw ? injuryRaw.toUpperCase() : null;
+  const sleeperStatus = String(player?.status ?? row.status ?? "").trim() || null;
+
+  return {
+    name,
+    position: positionRaw,
+    nflTeam,
+    opponent,
+    gameDate,
+    injuryBadge,
+    sleeperStatus,
+  };
+}
+
+function emptyProjectionResult(): WeeklyProjectionFetchResult {
+  return {
+    projections: new Map(),
+    positionHints: new Map(),
+    rawPositionHints: new Map(),
+    playerMeta: new Map(),
+  };
+}
+
 function parseProjectionRows(
   rows: ProjectionRow[],
   options: ParseProjectionOptions,
+  relevantPlayerIds?: Set<string>,
 ): WeeklyProjectionFetchResult {
   const projections = new Map<string, number>();
   const positionHints = new Map<string, SkillPosition[]>();
   const rawPositionHints = new Map<string, string | null>();
+  const playerMeta = new Map<string, ProjectionPlayerMeta>();
   const { ppr, scoringSettings } = options;
+  const filterIds = relevantPlayerIds?.size ? relevantPlayerIds : null;
 
   for (const row of rows) {
     if (!row || typeof row !== "object") continue;
     const playerId = playerIdFromRow(row);
     if (!playerId) continue;
+    if (filterIds && !filterIds.has(playerId)) continue;
+
+    const meta = parsePlayerMetaFromRow(row);
+    if (meta) playerMeta.set(playerId, meta);
 
     const pts = fantasyPointsFromProjectionRow(row, scoringSettings, ppr);
     if (pts > 0) projections.set(playerId, pts);
@@ -86,28 +152,13 @@ function parseProjectionRows(
     if (raw) rawPositionHints.set(playerId, raw);
   }
 
-  return { projections, positionHints, rawPositionHints };
-}
-
-function filterProjectionResult(
-  full: WeeklyProjectionFetchResult,
-  relevantPlayerIds: Set<string>,
-): WeeklyProjectionFetchResult {
-  const projections = new Map<string, number>();
-  const positionHints = new Map<string, SkillPosition[]>();
-  const rawPositionHints = new Map<string, string | null>();
-
-  for (const id of relevantPlayerIds) {
-    const pts = full.projections.get(id);
-    if (pts != null && pts > 0) projections.set(id, pts);
-    const skills = full.positionHints.get(id);
-    if (skills?.length) positionHints.set(id, skills);
-    const raw = full.rawPositionHints.get(id);
-    if (raw) rawPositionHints.set(id, raw);
-    if (isSleeperTeamDefenseId(id)) rawPositionHints.set(id, "DEF");
+  if (filterIds) {
+    for (const id of filterIds) {
+      if (isSleeperTeamDefenseId(id)) rawPositionHints.set(id, "DEF");
+    }
   }
 
-  return { projections, positionHints, rawPositionHints };
+  return { projections, positionHints, rawPositionHints, playerMeta };
 }
 
 async function fetchRawWeekRows(season: string, week: number): Promise<ProjectionRow[]> {
@@ -123,6 +174,17 @@ async function fetchRawWeekRows(season: string, week: number): Promise<Projectio
   return rows;
 }
 
+async function fetchFilteredWeekProjections(
+  season: string,
+  week: number,
+  options: ParseProjectionOptions,
+  relevantPlayerIds: Set<string>,
+): Promise<WeeklyProjectionFetchResult> {
+  const rows = await fetchRawWeekRows(season, week);
+  if (!rows.length) return emptyProjectionResult();
+  return parseProjectionRows(rows, options, relevantPlayerIds);
+}
+
 async function fetchFullWeekProjections(
   season: string,
   week: number,
@@ -132,11 +194,7 @@ async function fetchFullWeekProjections(
   const cached = parsedWeekCache.get(cacheKey);
   if (cached) return cached;
 
-  const empty: WeeklyProjectionFetchResult = {
-    projections: new Map(),
-    positionHints: new Map(),
-    rawPositionHints: new Map(),
-  };
+  const empty = emptyProjectionResult();
 
   const rows = await fetchRawWeekRows(season, week);
   if (!rows.length) return empty;
@@ -152,17 +210,36 @@ export type FetchWeeklyProjectionsOptions = {
   relevantPlayerIds?: Set<string>;
 };
 
+export async function fetchSleeperWeeklyProjectionRows(
+  season: string,
+  week: number,
+): Promise<ProjectionRow[]> {
+  return fetchRawWeekRows(season, week);
+}
+
+export function parseSleeperWeeklyProjectionsFromRows(
+  rows: ProjectionRow[],
+  options: FetchWeeklyProjectionsOptions,
+  relevantPlayerIds?: Set<string>,
+): WeeklyProjectionFetchResult {
+  if (!rows.length) return emptyProjectionResult();
+  const parseOptions: ParseProjectionOptions = {
+    ppr: options.ppr,
+    scoringSettings: options.scoringSettings,
+  };
+  if (relevantPlayerIds?.size) {
+    return parseProjectionRows(rows, parseOptions, relevantPlayerIds);
+  }
+  return parseProjectionRows(rows, parseOptions);
+}
+
 export async function fetchSleeperWeeklyProjectionsWithHints(
   season: string,
   week: number,
   pprOrOptions: PprMode | FetchWeeklyProjectionsOptions,
   relevantPlayerIdsLegacy?: Set<string>,
 ): Promise<WeeklyProjectionFetchResult> {
-  const empty: WeeklyProjectionFetchResult = {
-    projections: new Map(),
-    positionHints: new Map(),
-    rawPositionHints: new Map(),
-  };
+  const empty = emptyProjectionResult();
 
   const options: FetchWeeklyProjectionsOptions =
     typeof pprOrOptions === "number"
@@ -170,12 +247,14 @@ export async function fetchSleeperWeeklyProjectionsWithHints(
       : pprOrOptions;
 
   try {
-    const full = await fetchFullWeekProjections(season, week, {
+    const parseOptions = {
       ppr: options.ppr,
       scoringSettings: options.scoringSettings,
-    });
-    if (!options.relevantPlayerIds?.size) return full;
-    return filterProjectionResult(full, options.relevantPlayerIds);
+    };
+    if (options.relevantPlayerIds?.size) {
+      return await fetchFilteredWeekProjections(season, week, parseOptions, options.relevantPlayerIds);
+    }
+    return await fetchFullWeekProjections(season, week, parseOptions);
   } catch {
     return empty;
   }
@@ -294,6 +373,12 @@ export function starterPlayerIds(
   const fromRoster = rosterStarters?.filter(Boolean);
   if (fromRoster?.length) return fromRoster;
   return rosterPlayers?.filter(Boolean) ?? [];
+}
+
+/** Warm raw weekly projection downloads into the in-process cache (no full parse). */
+export async function prefetchProjectionWeekRows(season: string, weeks: number[]): Promise<void> {
+  const uniqueWeeks = [...new Set(weeks.filter((w) => Number.isFinite(w) && w >= 1))];
+  await Promise.all(uniqueWeeks.map((week) => fetchRawWeekRows(season, week)));
 }
 
 /** @visibleForTesting */

@@ -34,6 +34,7 @@ export type SleeperMatchup = {
   custom_points?: number | null;
   starters?: string[];
   players?: string[];
+  players_points?: Record<string, number> | null;
 };
 
 export type SleeperBracketMatch = {
@@ -95,6 +96,11 @@ export type SleeperRoster = {
   starters: string[] | null;
   reserve: string[] | null;
   taxi: string[] | null;
+  settings?: {
+    wins?: number;
+    losses?: number;
+    ties?: number;
+  };
 };
 
 export type SleeperLeagueUser = {
