@@ -1,0 +1,37 @@
+{
+  "eval_id": 1,
+  "eval_name": "pattern-choice",
+  "prompt": "I'm adding a navigation control to my fantasy app's top nav bar. When a user clicks their team name, they should see options to switch between their teams in different leagues. I'm trying to decide between using a dialog, a menu (role=menu), or a combobox. Which pattern should I use and why? The options are just a flat list of 3–5 team names that navigate to that team's page when selected.",
+  "assertions": [
+    {
+      "text": "Does NOT recommend role=menu for this use case",
+      "passed": null,
+      "evidence": null
+    },
+    {
+      "text": "Does NOT recommend dialog for this use case",
+      "passed": null,
+      "evidence": null
+    },
+    {
+      "text": "Does NOT recommend combobox for this use case",
+      "passed": null,
+      "evidence": null
+    },
+    {
+      "text": "Recommends a disclosure button (<button> with aria-expanded) + list of links",
+      "passed": null,
+      "evidence": null
+    },
+    {
+      "text": "Explains WHY role=menu is wrong (it's for app actions, not navigation links)",
+      "passed": null,
+      "evidence": null
+    },
+    {
+      "text": "Recommends using <a> elements (links) rather than <button> elements for the team options",
+      "passed": null,
+      "evidence": null
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "eval_id": 0,
+  "eval_name": "modal-dialog",
+  "configuration": "with_skill",
+  "expectations": [
+    {
+      "text": "Recommends <dialog> element OR role='dialog' with aria-modal='true'",
+      "passed": true,
+      "evidence": "Explicitly recommends native <dialog> element with .showModal() and explains why it's preferred over <div role='dialog'>"
+    },
+    {
+      "text": "Mentions aria-labelledby pointing to the dialog title",
+      "passed": true,
+      "evidence": "Uses aria-labelledby='trade-dialog-title' pointing at the <h2> and explains why aria-labelledby is preferred over aria-label"
+    },
+    {
+      "text": "Covers focus trap — focus cycles within the modal",
+      "passed": true,
+      "evidence": "Notes that showModal() handles focus trapping automatically; explains not to add manual trap on top"
+    },
+    {
+      "text": "Mentions moving focus INTO the dialog on open",
+      "passed": true,
+      "evidence": "Uses autoFocus on Send Offer button; explains the rationale and alternate approach of focusing the dialog element itself"
+    },
+    {
+      "text": "Mentions returning focus to trigger element on close",
+      "passed": true,
+      "evidence": "Passes triggerRef and calls triggerRef.current?.focus() in useEffect watching isOpen"
+    },
+    {
+      "text": "Covers Escape key closing the dialog",
+      "passed": true,
+      "evidence": "Intercepts the native 'cancel' event with preventDefault and calls onCancel(); explains why preventDefault is needed"
+    },
+    {
+      "text": "Provides working code (not just description)",
+      "passed": true,
+      "evidence": "Full TypeScript React component with props interface, useEffect hooks, and usage example"
+    }
+  ]
+}

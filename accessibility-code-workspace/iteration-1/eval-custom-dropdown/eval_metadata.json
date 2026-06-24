@@ -1,0 +1,47 @@
+{
+  "eval_id": 1,
+  "eval_name": "custom-dropdown",
+  "prompt": "I have a custom player search combobox in my dynasty app — it's a text input that filters a list of players as you type, and you can click a player to add them to your roster. Right now it's just a plain <input> and a <ul> that appears below it. A screen reader user told me it's completely unusable. How do I fix it?",
+  "assertions": [
+    {
+      "text": "Adds role='combobox' to the input or wrapping element",
+      "passed": null,
+      "evidence": null
+    },
+    {
+      "text": "Includes aria-expanded to reflect open/closed state",
+      "passed": null,
+      "evidence": null
+    },
+    {
+      "text": "Includes aria-controls pointing to the listbox",
+      "passed": null,
+      "evidence": null
+    },
+    {
+      "text": "Adds role='listbox' to the results list",
+      "passed": null,
+      "evidence": null
+    },
+    {
+      "text": "Adds role='option' to each result item",
+      "passed": null,
+      "evidence": null
+    },
+    {
+      "text": "Mentions aria-activedescendant for tracking highlighted option",
+      "passed": null,
+      "evidence": null
+    },
+    {
+      "text": "Covers keyboard pattern: arrows to navigate, Enter to select, Escape to close",
+      "passed": null,
+      "evidence": null
+    },
+    {
+      "text": "Mentions the input needs a <label>",
+      "passed": null,
+      "evidence": null
+    }
+  ]
+}

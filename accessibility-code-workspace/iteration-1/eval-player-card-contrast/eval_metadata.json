@@ -1,0 +1,32 @@
+{
+  "eval_id": 2,
+  "eval_name": "player-card-contrast",
+  "prompt": "My player cards show a player's name, position, team, and their projected points. The projected points are highlighted in green when they're above 15 points. My designer flagged this might have contrast issues. Also I'm showing injury status with just a colored dot (green/yellow/red). Walk me through what I need to check and fix for accessibility.",
+  "assertions": [
+    {
+      "text": "Identifies the correct contrast ratio threshold (4.5:1 for normal text, 3:1 for large text)",
+      "passed": null,
+      "evidence": null
+    },
+    {
+      "text": "Suggests a tool or method to check the actual contrast ratio",
+      "passed": null,
+      "evidence": null
+    },
+    {
+      "text": "Identifies the color-only dot as a WCAG 1.4.1 violation",
+      "passed": null,
+      "evidence": null
+    },
+    {
+      "text": "Provides a concrete fix for the color-only dot (adding text, icon, or label)",
+      "passed": null,
+      "evidence": null
+    },
+    {
+      "text": "References specific WCAG criteria (e.g., 1.4.3 for contrast, 1.4.1 for color-only)",
+      "passed": null,
+      "evidence": null
+    }
+  ]
+}

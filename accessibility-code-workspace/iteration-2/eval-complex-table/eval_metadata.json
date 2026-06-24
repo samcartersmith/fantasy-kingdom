@@ -1,0 +1,37 @@
+{
+  "eval_id": 2,
+  "eval_name": "complex-table",
+  "prompt": "I need to build an accessible stats table for my dynasty app. It shows weekly scoring for each player on my roster: rows are players, columns are weeks (Week 1 through Week 17), plus a final column for the season total. Some players have a bye week shown as '—'. The table also has a caption explaining what it shows. How should I mark this up accessibly?",
+  "assertions": [
+    {
+      "text": "Recommends <caption> element for the table description",
+      "passed": null,
+      "evidence": null
+    },
+    {
+      "text": "Uses <thead> with <th scope='col'> for week column headers",
+      "passed": null,
+      "evidence": null
+    },
+    {
+      "text": "Uses <th scope='row'> for the player name column",
+      "passed": null,
+      "evidence": null
+    },
+    {
+      "text": "Addresses the '—' bye week cell — needs accessible text (aria-label or visually hidden text), not just a dash character",
+      "passed": null,
+      "evidence": null
+    },
+    {
+      "text": "Advises against role=grid since the table is read-only data (not interactive)",
+      "passed": null,
+      "evidence": null
+    },
+    {
+      "text": "Addresses abbreviated column headers (e.g. 'Wk 1') — recommends <abbr> or aria-label for full text",
+      "passed": null,
+      "evidence": null
+    }
+  ]
+}

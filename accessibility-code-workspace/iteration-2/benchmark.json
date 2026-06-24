@@ -1,0 +1,363 @@
+{
+  "metadata": {
+    "skill_name": "accessibility-code",
+    "skill_path": "<path/to/skill>",
+    "executor_model": "<model-name>",
+    "analyzer_model": "<model-name>",
+    "timestamp": "2026-06-20T21:56:10Z",
+    "evals_run": [
+      0,
+      1,
+      2
+    ],
+    "runs_per_configuration": 3
+  },
+  "runs": [
+    {
+      "eval_id": 2,
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.833,
+        "passed": 5,
+        "failed": 1,
+        "total": 6,
+        "time_seconds": 0.0,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Recommends <caption> element for the table description",
+          "passed": true,
+          "evidence": "'<caption> over aria-label \u2014 the caption is visible, native, and universally supported by screen readers'"
+        },
+        {
+          "text": "Uses <thead> with <th scope='col'> for week column headers",
+          "passed": true,
+          "evidence": "scope='col' on week headers in <thead> explicitly mentioned"
+        },
+        {
+          "text": "Uses <th scope='row'> for the player name column",
+          "passed": true,
+          "evidence": "scope='row' on player name cells in <tbody> explicitly mentioned with note about VoiceOver on iOS"
+        },
+        {
+          "text": "Addresses the '\u2014' bye week cell \u2014 needs accessible text (aria-label or visually hidden text), not just a dash character",
+          "passed": true,
+          "evidence": "aria-hidden='true' on dash + visually-hidden <span class='sr-only'>bye</span> \u2014 correct pattern"
+        },
+        {
+          "text": "Advises against role=grid since the table is read-only data (not interactive)",
+          "passed": true,
+          "evidence": "'Do NOT use role=grid \u2014 that pattern is for interactive, editable grids and requires full arrow-key keyboard management'"
+        },
+        {
+          "text": "Addresses abbreviated column headers (e.g. 'Wk 1') \u2014 recommends <abbr> or aria-label for full text",
+          "passed": false,
+          "evidence": "Not explicitly addressed in the summary; scope and bye week covered but abbreviated headers not mentioned"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 0,
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 7,
+        "failed": 0,
+        "total": 7,
+        "time_seconds": 0.0,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Covers a keyboard alternative interaction (pick up / move / drop / cancel)",
+          "passed": true,
+          "evidence": "Parallel keyboard interaction built separately from mouse drag events \u2014 Space/Enter to pick up, Tab/arrows to navigate, Enter to drop, Escape to cancel"
+        },
+        {
+          "text": "Mentions Space or Enter to pick up and drop, arrow keys to move",
+          "passed": true,
+          "evidence": "Enter/Space to pick up, arrow keys for roving tabindex within available players, Enter to drop"
+        },
+        {
+          "text": "Mentions Escape to cancel a drag operation",
+          "passed": true,
+          "evidence": "Escape cancels the operation, returns focus to player list"
+        },
+        {
+          "text": "Flags that aria-grabbed is deprecated and should not be used",
+          "passed": true,
+          "evidence": "'Do not use aria-grabbed alone... It was deprecated in ARIA 1.1 because it was inconsistently supported. Use it as a supplement, but rely on aria-selected and live region announcements as the primary mechanism' \u2014 correctly demotes it"
+        },
+        {
+          "text": "Covers live region announcements for drag state (picked up, moved to, dropped)",
+          "passed": true,
+          "evidence": "announce() helper with textContent='' + requestAnimationFrame trick; scripts what to say at each stage"
+        },
+        {
+          "text": "Mentions visible indication of the 'grabbed' / active drag state",
+          "passed": true,
+          "evidence": "CSS for drag mode and valid drop targets mentioned in testing checklist"
+        },
+        {
+          "text": "Mentions providing instructions to users on how to use the keyboard interface",
+          "passed": true,
+          "evidence": "Keyboard instructions are part of the recommended UX; flagged in WCAG anti-patterns section"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 1,
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 6,
+        "failed": 0,
+        "total": 6,
+        "time_seconds": 0.0,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Does NOT recommend role=menu for this use case",
+          "passed": true,
+          "evidence": "Explicitly rejects role=menu: 'Semantically incorrect. menu/menuitem is for application-style action menus, not navigation'"
+        },
+        {
+          "text": "Does NOT recommend dialog for this use case",
+          "passed": true,
+          "evidence": "Explicitly rejects dialog: 'Too heavy. Dialogs imply a task requiring a decision and trap focus. Switching teams is a single-step navigation action'"
+        },
+        {
+          "text": "Does NOT recommend combobox for this use case",
+          "passed": true,
+          "evidence": "Explicitly rejects combobox: 'Wrong affordance. Combobox signals type to filter and is announced as a form input'"
+        },
+        {
+          "text": "Recommends a disclosure button (<button> with aria-expanded) + list of links",
+          "passed": true,
+          "evidence": "Recommends button with aria-expanded paired with <ul hidden> of <a> links \u2014 the APG Disclosure pattern"
+        },
+        {
+          "text": "Explains WHY role=menu is wrong (it's for app actions, not navigation links)",
+          "passed": true,
+          "evidence": "'menu/menuitem is for application-style action menus (think right-click context menus), not navigation. Screen readers announce menu widgets in application mode, suppressing normal reading shortcuts'"
+        },
+        {
+          "text": "Recommends using <a> elements (links) rather than <button> elements for the team options",
+          "passed": true,
+          "evidence": "'Native <a> link behavior (Tab through, Enter to navigate)' \u2014 links recommended for the team options"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 2,
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.667,
+        "passed": 4,
+        "failed": 2,
+        "total": 6,
+        "time_seconds": 0.0,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Recommends <caption> element for the table description",
+          "passed": true,
+          "evidence": "'Place a <caption> as the first child of <table>. It is the programmatic label for the table'"
+        },
+        {
+          "text": "Uses <thead> with <th scope='col'> for week column headers",
+          "passed": true,
+          "evidence": "'All column headers use <th scope=\"col\">'"
+        },
+        {
+          "text": "Uses <th scope='row'> for the player name column",
+          "passed": true,
+          "evidence": "'Player name cells use <th scope=\"row\">, not <td>. This is the critical distinction between a layout table and a data table'"
+        },
+        {
+          "text": "Addresses the '\u2014' bye week cell \u2014 needs accessible text (aria-label or visually hidden text), not just a dash character",
+          "passed": true,
+          "evidence": "aria-hidden on dash + sr-only 'bye' span \u2014 same correct pattern"
+        },
+        {
+          "text": "Advises against role=grid since the table is read-only data (not interactive)",
+          "passed": false,
+          "evidence": "role=grid not addressed; no guidance on when to use or avoid it"
+        },
+        {
+          "text": "Addresses abbreviated column headers (e.g. 'Wk 1') \u2014 recommends <abbr> or aria-label for full text",
+          "passed": false,
+          "evidence": "Abbreviated headers not mentioned"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 0,
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.857,
+        "passed": 6,
+        "failed": 1,
+        "total": 7,
+        "time_seconds": 0.0,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Covers a keyboard alternative interaction (pick up / move / drop / cancel)",
+          "passed": true,
+          "evidence": "Space/Enter pick up, Tab/Arrow navigate, Space/Enter drop, Escape cancel"
+        },
+        {
+          "text": "Mentions Space or Enter to pick up and drop, arrow keys to move",
+          "passed": true,
+          "evidence": "Documented in keyboard interaction section"
+        },
+        {
+          "text": "Mentions Escape to cancel a drag operation",
+          "passed": true,
+          "evidence": "Escape cancels and returns focus"
+        },
+        {
+          "text": "Flags that aria-grabbed is deprecated and should not be used",
+          "passed": false,
+          "evidence": "Says 'aria-grabbed and aria-dropeffect are deprecated in ARIA 1.1 but still have good screen reader support. They are safe to use' \u2014 does not flag as avoid; actively recommends continuing use"
+        },
+        {
+          "text": "Covers live region announcements for drag state (picked up, moved to, dropped)",
+          "passed": true,
+          "evidence": "Hidden aria-live region announces each drag state change"
+        },
+        {
+          "text": "Mentions visible indication of the 'grabbed' / active drag state",
+          "passed": true,
+          "evidence": "CSS for drag mode and valid drop targets included"
+        },
+        {
+          "text": "Mentions providing instructions to users on how to use the keyboard interface",
+          "passed": true,
+          "evidence": "aria-describedby linking to static keyboard instructions"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 1,
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.333,
+        "passed": 2,
+        "failed": 4,
+        "total": 6,
+        "time_seconds": 0.0,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Does NOT recommend role=menu for this use case",
+          "passed": false,
+          "evidence": "Incorrectly recommends role=menu: 'A role=menu triggered by a button represents a list of actions or choices \u2014 which is exactly what this control is'"
+        },
+        {
+          "text": "Does NOT recommend dialog for this use case",
+          "passed": true,
+          "evidence": "Correctly rejects dialog as too heavy"
+        },
+        {
+          "text": "Does NOT recommend combobox for this use case",
+          "passed": true,
+          "evidence": "Correctly rejects combobox as wrong affordance"
+        },
+        {
+          "text": "Recommends a disclosure button (<button> with aria-expanded) + list of links",
+          "passed": false,
+          "evidence": "Recommends role=menu with menuitem children instead of disclosure + links"
+        },
+        {
+          "text": "Explains WHY role=menu is wrong (it's for app actions, not navigation links)",
+          "passed": false,
+          "evidence": "Does the opposite \u2014 argues role=menu IS correct; does not distinguish between app menus and navigation"
+        },
+        {
+          "text": "Recommends using <a> elements (links) rather than <button> elements for the team options",
+          "passed": false,
+          "evidence": "Recommends menuitem role (buttons) rather than <a> links for navigation items"
+        }
+      ],
+      "notes": []
+    }
+  ],
+  "run_summary": {
+    "with_skill": {
+      "pass_rate": {
+        "mean": 0.9443,
+        "stddev": 0.0964,
+        "min": 0.833,
+        "max": 1.0
+      },
+      "time_seconds": {
+        "mean": 0.0,
+        "stddev": 0.0,
+        "min": 0.0,
+        "max": 0.0
+      },
+      "tokens": {
+        "mean": 0.0,
+        "stddev": 0.0,
+        "min": 0,
+        "max": 0
+      }
+    },
+    "without_skill": {
+      "pass_rate": {
+        "mean": 0.619,
+        "stddev": 0.2653,
+        "min": 0.333,
+        "max": 0.857
+      },
+      "time_seconds": {
+        "mean": 0.0,
+        "stddev": 0.0,
+        "min": 0.0,
+        "max": 0.0
+      },
+      "tokens": {
+        "mean": 0.0,
+        "stddev": 0.0,
+        "min": 0,
+        "max": 0
+      }
+    },
+    "delta": {
+      "pass_rate": "+0.33",
+      "time_seconds": "+0.0",
+      "tokens": "+0"
+    }
+  },
+  "notes": []
+}
