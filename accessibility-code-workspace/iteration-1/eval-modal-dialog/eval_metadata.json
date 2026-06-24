@@ -1,0 +1,42 @@
+{
+  "eval_id": 0,
+  "eval_name": "modal-dialog",
+  "prompt": "I'm building a 'Confirm Trade' modal dialog in React for my fantasy football app. When the user clicks 'Propose Trade', this modal pops up showing the trade details and two buttons: 'Send Offer' and 'Cancel'. What's the fully accessible implementation? I want the right HTML structure, ARIA attributes, keyboard behavior, and focus management.",
+  "assertions": [
+    {
+      "text": "Recommends <dialog> element OR role='dialog' with aria-modal='true'",
+      "passed": null,
+      "evidence": null
+    },
+    {
+      "text": "Mentions aria-labelledby pointing to the dialog title",
+      "passed": null,
+      "evidence": null
+    },
+    {
+      "text": "Covers focus trap — focus cycles within the modal",
+      "passed": null,
+      "evidence": null
+    },
+    {
+      "text": "Mentions moving focus INTO the dialog on open",
+      "passed": null,
+      "evidence": null
+    },
+    {
+      "text": "Mentions returning focus to trigger element on close",
+      "passed": null,
+      "evidence": null
+    },
+    {
+      "text": "Covers Escape key closing the dialog",
+      "passed": null,
+      "evidence": null
+    },
+    {
+      "text": "Provides working code (not just description)",
+      "passed": null,
+      "evidence": null
+    }
+  ]
+}

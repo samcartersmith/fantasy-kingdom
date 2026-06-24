@@ -1,0 +1,42 @@
+{
+  "eval_id": 0,
+  "eval_name": "drag-drop",
+  "prompt": "I'm building a drag-and-drop roster management feature for my dynasty fantasy app. Users can drag players from a 'Available Players' list and drop them into one of their roster slots. How do I make this fully accessible? I need it to work for keyboard-only users and screen reader users who can't use a mouse.",
+  "assertions": [
+    {
+      "text": "Covers a keyboard alternative interaction (pick up / move / drop / cancel)",
+      "passed": null,
+      "evidence": null
+    },
+    {
+      "text": "Mentions Space or Enter to pick up and drop, arrow keys to move",
+      "passed": null,
+      "evidence": null
+    },
+    {
+      "text": "Mentions Escape to cancel a drag operation",
+      "passed": null,
+      "evidence": null
+    },
+    {
+      "text": "Flags that aria-grabbed is deprecated and should not be used",
+      "passed": null,
+      "evidence": null
+    },
+    {
+      "text": "Covers live region announcements for drag state (picked up, moved to, dropped)",
+      "passed": null,
+      "evidence": null
+    },
+    {
+      "text": "Mentions visible indication of the 'grabbed' / active drag state",
+      "passed": null,
+      "evidence": null
+    },
+    {
+      "text": "Mentions providing instructions to users on how to use the keyboard interface",
+      "passed": null,
+      "evidence": null
+    }
+  ]
+}

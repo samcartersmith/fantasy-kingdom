@@ -1,0 +1,42 @@
+{
+  "eval_id": 0,
+  "eval_name": "modal-dialog",
+  "configuration": "without_skill",
+  "expectations": [
+    {
+      "text": "Recommends <dialog> element OR role='dialog' with aria-modal='true'",
+      "passed": true,
+      "evidence": "Uses <div role='dialog' aria-modal='true'> — valid but not the native <dialog> element. Does not recommend the native element."
+    },
+    {
+      "text": "Mentions aria-labelledby pointing to the dialog title",
+      "passed": true,
+      "evidence": "Uses aria-labelledby='trade-dialog-title' pointing at <h2>"
+    },
+    {
+      "text": "Covers focus trap — focus cycles within the modal",
+      "passed": true,
+      "evidence": "Implements manual focus trap with querySelectorAll of focusable elements and Tab key interception"
+    },
+    {
+      "text": "Mentions moving focus INTO the dialog on open",
+      "passed": true,
+      "evidence": "useEffect with setTimeout moves focus to cancelButtonRef on open"
+    },
+    {
+      "text": "Mentions returning focus to trigger element on close",
+      "passed": true,
+      "evidence": "Mentioned in a separate code note but not wired in main component — requires extra work from reader to implement"
+    },
+    {
+      "text": "Covers Escape key closing the dialog",
+      "passed": true,
+      "evidence": "handleKeyDown checks for Escape key and calls onCancel()"
+    },
+    {
+      "text": "Provides working code (not just description)",
+      "passed": true,
+      "evidence": "Full JSX component with createPortal, focus trap, keyboard handler"
+    }
+  ]
+}

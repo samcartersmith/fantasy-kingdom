@@ -1,0 +1,1325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Eval Review</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600&family=Lora:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" integrity="sha384-EnyY0/GSHQGSxSgMwaIPzSESbqoOLSexfnSMN2AP+39Ckmn92stwABZynq1JyzdT" crossorigin="anonymous"></script>
+  <style>
+    :root {
+      --bg: #faf9f5;
+      --surface: #ffffff;
+      --border: #e8e6dc;
+      --text: #141413;
+      --text-muted: #b0aea5;
+      --accent: #d97757;
+      --accent-hover: #c4613f;
+      --green: #788c5d;
+      --green-bg: #eef2e8;
+      --red: #c44;
+      --red-bg: #fceaea;
+      --header-bg: #141413;
+      --header-text: #faf9f5;
+      --radius: 6px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Lora', Georgia, serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ---- Header ---- */
+    .header {
+      background: var(--header-bg);
+      color: var(--header-text);
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    .header h1 {
+      font-family: 'Poppins', sans-serif;
+      font-size: 1.25rem;
+      font-weight: 600;
+    }
+    .header .instructions {
+      font-size: 0.8rem;
+      opacity: 0.7;
+      margin-top: 0.25rem;
+    }
+    .header .progress {
+      font-size: 0.875rem;
+      opacity: 0.8;
+      text-align: right;
+    }
+
+    /* ---- Main content ---- */
+    .main {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1.5rem 2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    /* ---- Sections ---- */
+    .section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      flex-shrink: 0;
+    }
+    .section-header {
+      font-family: 'Poppins', sans-serif;
+      padding: 0.75rem 1rem;
+      font-size: 0.75rem;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border);
+      background: var(--bg);
+    }
+    .section-body {
+      padding: 1rem;
+    }
+
+    /* ---- Config badge ---- */
+    .config-badge {
+      display: inline-block;
+      padding: 0.2rem 0.625rem;
+      border-radius: 9999px;
+      font-family: 'Poppins', sans-serif;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      margin-left: 0.75rem;
+      vertical-align: middle;
+    }
+    .config-badge.config-primary {
+      background: rgba(33, 150, 243, 0.12);
+      color: #1976d2;
+    }
+    .config-badge.config-baseline {
+      background: rgba(255, 193, 7, 0.15);
+      color: #f57f17;
+    }
+
+    /* ---- Prompt ---- */
+    .prompt-text {
+      white-space: pre-wrap;
+      font-size: 0.9375rem;
+      line-height: 1.6;
+    }
+
+    /* ---- Outputs ---- */
+    .output-file {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .output-file + .output-file {
+      margin-top: 1rem;
+    }
+    .output-file-header {
+      padding: 0.5rem 0.75rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      font-family: 'SF Mono', SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .output-file-header .dl-btn {
+      font-size: 0.7rem;
+      color: var(--accent);
+      text-decoration: none;
+      cursor: pointer;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-weight: 500;
+      opacity: 0.8;
+    }
+    .output-file-header .dl-btn:hover {
+      opacity: 1;
+      text-decoration: underline;
+    }
+    .output-file-content {
+      padding: 0.75rem;
+      overflow-x: auto;
+    }
+    .output-file-content pre {
+      font-size: 0.8125rem;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-family: 'SF Mono', SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace;
+    }
+    .output-file-content img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 4px;
+    }
+    .output-file-content iframe {
+      width: 100%;
+      height: 600px;
+      border: none;
+    }
+    .output-file-content table {
+      border-collapse: collapse;
+      font-size: 0.8125rem;
+      width: 100%;
+    }
+    .output-file-content table td,
+    .output-file-content table th {
+      border: 1px solid var(--border);
+      padding: 0.375rem 0.5rem;
+      text-align: left;
+    }
+    .output-file-content table th {
+      background: var(--bg);
+      font-weight: 600;
+    }
+    .output-file-content .download-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--accent);
+      text-decoration: none;
+      font-size: 0.875rem;
+      cursor: pointer;
+    }
+    .output-file-content .download-link:hover {
+      background: var(--border);
+    }
+    .empty-state {
+      color: var(--text-muted);
+      font-style: italic;
+      padding: 2rem;
+      text-align: center;
+    }
+
+    /* ---- Feedback ---- */
+    .prev-feedback {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 0.625rem 0.75rem;
+      margin-top: 0.75rem;
+      font-size: 0.8125rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+    .prev-feedback-label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 0.25rem;
+      color: var(--text-muted);
+    }
+    .feedback-textarea {
+      width: 100%;
+      min-height: 100px;
+      padding: 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      font-family: inherit;
+      font-size: 0.9375rem;
+      line-height: 1.5;
+      resize: vertical;
+      color: var(--text);
+    }
+    .feedback-textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    }
+    .feedback-status {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 0.5rem;
+      min-height: 1.1em;
+    }
+
+    /* ---- Grades (collapsible) ---- */
+    .grades-toggle {
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      user-select: none;
+    }
+    .grades-toggle:hover {
+      color: var(--accent);
+    }
+    .grades-toggle .arrow {
+      margin-right: 0.5rem;
+      transition: transform 0.15s;
+      font-size: 0.75rem;
+    }
+    .grades-toggle .arrow.open {
+      transform: rotate(90deg);
+    }
+    .grades-content {
+      display: none;
+      margin-top: 0.75rem;
+    }
+    .grades-content.open {
+      display: block;
+    }
+    .grades-summary {
+      font-size: 0.875rem;
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .grade-badge {
+      display: inline-block;
+      padding: 0.125rem 0.5rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .grade-pass { background: var(--green-bg); color: var(--green); }
+    .grade-fail { background: var(--red-bg); color: var(--red); }
+    .assertion-list {
+      list-style: none;
+    }
+    .assertion-item {
+      padding: 0.625rem 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.8125rem;
+    }
+    .assertion-item:last-child { border-bottom: none; }
+    .assertion-status {
+      font-weight: 600;
+      margin-right: 0.5rem;
+    }
+    .assertion-status.pass { color: var(--green); }
+    .assertion-status.fail { color: var(--red); }
+    .assertion-evidence {
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      margin-top: 0.25rem;
+      padding-left: 1.5rem;
+    }
+
+    /* ---- View tabs ---- */
+    .view-tabs {
+      display: flex;
+      gap: 0;
+      padding: 0 2rem;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .view-tab {
+      font-family: 'Poppins', sans-serif;
+      padding: 0.625rem 1.25rem;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      background: none;
+      color: var(--text-muted);
+      border-bottom: 2px solid transparent;
+      transition: all 0.15s;
+    }
+    .view-tab:hover { color: var(--text); }
+    .view-tab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+    .view-panel { display: none; }
+    .view-panel.active { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
+
+    /* ---- Benchmark view ---- */
+    .benchmark-view {
+      padding: 1.5rem 2rem;
+      overflow-y: auto;
+      flex: 1;
+    }
+    .benchmark-table {
+      border-collapse: collapse;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-size: 0.8125rem;
+      width: 100%;
+      margin-bottom: 1.5rem;
+    }
+    .benchmark-table th, .benchmark-table td {
+      padding: 0.625rem 0.75rem;
+      text-align: left;
+      border: 1px solid var(--border);
+    }
+    .benchmark-table th {
+      font-family: 'Poppins', sans-serif;
+      background: var(--header-bg);
+      color: var(--header-text);
+      font-weight: 500;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .benchmark-table tr:hover { background: var(--bg); }
+    .benchmark-table tr.benchmark-row-with { background: rgba(33, 150, 243, 0.06); }
+    .benchmark-table tr.benchmark-row-without { background: rgba(255, 193, 7, 0.06); }
+    .benchmark-table tr.benchmark-row-with:hover { background: rgba(33, 150, 243, 0.12); }
+    .benchmark-table tr.benchmark-row-without:hover { background: rgba(255, 193, 7, 0.12); }
+    .benchmark-table tr.benchmark-row-avg { font-weight: 600; border-top: 2px solid var(--border); }
+    .benchmark-table tr.benchmark-row-avg.benchmark-row-with { background: rgba(33, 150, 243, 0.12); }
+    .benchmark-table tr.benchmark-row-avg.benchmark-row-without { background: rgba(255, 193, 7, 0.12); }
+    .benchmark-delta-positive { color: var(--green); font-weight: 600; }
+    .benchmark-delta-negative { color: var(--red); font-weight: 600; }
+    .benchmark-notes {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem;
+    }
+    .benchmark-notes h3 {
+      font-family: 'Poppins', sans-serif;
+      font-size: 0.875rem;
+      margin-bottom: 0.75rem;
+    }
+    .benchmark-notes ul {
+      list-style: disc;
+      padding-left: 1.25rem;
+    }
+    .benchmark-notes li {
+      font-size: 0.8125rem;
+      line-height: 1.6;
+      margin-bottom: 0.375rem;
+    }
+    .benchmark-empty {
+      color: var(--text-muted);
+      font-style: italic;
+      text-align: center;
+      padding: 3rem;
+    }
+
+    /* ---- Navigation ---- */
+    .nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 2rem;
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+      flex-shrink: 0;
+    }
+    .nav-btn {
+      font-family: 'Poppins', sans-serif;
+      padding: 0.5rem 1.25rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      cursor: pointer;
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--text);
+      transition: all 0.15s;
+    }
+    .nav-btn:hover:not(:disabled) {
+      background: var(--bg);
+      border-color: var(--text-muted);
+    }
+    .nav-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    .done-btn {
+      font-family: 'Poppins', sans-serif;
+      padding: 0.5rem 1.5rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      color: var(--text);
+      cursor: pointer;
+      font-size: 0.875rem;
+      font-weight: 500;
+      transition: all 0.15s;
+    }
+    .done-btn:hover {
+      background: var(--bg);
+      border-color: var(--text-muted);
+    }
+    .done-btn.ready {
+      border: none;
+      background: var(--accent);
+      color: white;
+      font-weight: 600;
+    }
+    .done-btn.ready:hover {
+      background: var(--accent-hover);
+    }
+    /* ---- Done overlay ---- */
+    .done-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 100;
+      justify-content: center;
+      align-items: center;
+    }
+    .done-overlay.visible {
+      display: flex;
+    }
+    .done-card {
+      background: var(--surface);
+      border-radius: 12px;
+      padding: 2rem 3rem;
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      max-width: 500px;
+    }
+    .done-card h2 {
+      font-size: 1.5rem;
+      margin-bottom: 0.5rem;
+    }
+    .done-card p {
+      color: var(--text-muted);
+      margin-bottom: 1.5rem;
+      line-height: 1.5;
+    }
+    .done-card .btn-row {
+      display: flex;
+      gap: 0.5rem;
+      justify-content: center;
+    }
+    .done-card button {
+      padding: 0.5rem 1.25rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      cursor: pointer;
+      font-size: 0.875rem;
+    }
+    .done-card button:hover {
+      background: var(--bg);
+    }
+    /* ---- Toast ---- */
+    .toast {
+      position: fixed;
+      bottom: 5rem;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--header-bg);
+      color: var(--header-text);
+      padding: 0.625rem 1.25rem;
+      border-radius: var(--radius);
+      font-size: 0.875rem;
+      opacity: 0;
+      transition: opacity 0.3s;
+      pointer-events: none;
+      z-index: 200;
+    }
+    .toast.visible {
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+  <div id="app" style="height:100vh; display:flex; flex-direction:column;">
+    <div class="header">
+      <div>
+        <h1>Eval Review: <span id="skill-name"></span></h1>
+        <div class="instructions">Review each output and leave feedback below. Navigate with arrow keys or buttons. When done, copy feedback and paste into Claude Code.</div>
+      </div>
+      <div class="progress" id="progress"></div>
+    </div>
+
+    <!-- View tabs (only shown when benchmark data exists) -->
+    <div class="view-tabs" id="view-tabs" style="display:none;">
+      <button class="view-tab active" onclick="switchView('outputs')">Outputs</button>
+      <button class="view-tab" onclick="switchView('benchmark')">Benchmark</button>
+    </div>
+
+    <!-- Outputs panel (qualitative review) -->
+    <div class="view-panel active" id="panel-outputs">
+    <div class="main">
+      <!-- Prompt -->
+      <div class="section">
+        <div class="section-header">Prompt <span class="config-badge" id="config-badge" style="display:none;"></span></div>
+        <div class="section-body">
+          <div class="prompt-text" id="prompt-text"></div>
+        </div>
+      </div>
+
+      <!-- Outputs -->
+      <div class="section">
+        <div class="section-header">Output</div>
+        <div class="section-body" id="outputs-body">
+          <div class="empty-state">No output files found</div>
+        </div>
+      </div>
+
+      <!-- Previous Output (collapsible) -->
+      <div class="section" id="prev-outputs-section" style="display:none;">
+        <div class="section-header">
+          <div class="grades-toggle" onclick="togglePrevOutputs()">
+            <span class="arrow" id="prev-outputs-arrow">&#9654;</span>
+            Previous Output
+          </div>
+        </div>
+        <div class="grades-content" id="prev-outputs-content"></div>
+      </div>
+
+      <!-- Grades (collapsible) -->
+      <div class="section" id="grades-section" style="display:none;">
+        <div class="section-header">
+          <div class="grades-toggle" onclick="toggleGrades()">
+            <span class="arrow" id="grades-arrow">&#9654;</span>
+            Formal Grades
+          </div>
+        </div>
+        <div class="grades-content" id="grades-content"></div>
+      </div>
+
+      <!-- Feedback -->
+      <div class="section">
+        <div class="section-header">Your Feedback</div>
+        <div class="section-body">
+          <textarea
+            class="feedback-textarea"
+            id="feedback"
+            placeholder="What do you think of this output? Any issues, suggestions, or things that look great?"
+          ></textarea>
+          <div class="feedback-status" id="feedback-status"></div>
+          <div class="prev-feedback" id="prev-feedback" style="display:none;">
+            <div class="prev-feedback-label">Previous feedback</div>
+            <div id="prev-feedback-text"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="nav" id="outputs-nav">
+      <button class="nav-btn" id="prev-btn" onclick="navigate(-1)">&#8592; Previous</button>
+      <button class="done-btn" id="done-btn" onclick="showDoneDialog()">Submit All Reviews</button>
+      <button class="nav-btn" id="next-btn" onclick="navigate(1)">Next &#8594;</button>
+    </div>
+    </div><!-- end panel-outputs -->
+
+    <!-- Benchmark panel (quantitative stats) -->
+    <div class="view-panel" id="panel-benchmark">
+      <div class="benchmark-view" id="benchmark-content">
+        <div class="benchmark-empty">No benchmark data available. Run a benchmark to see quantitative results here.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Done overlay -->
+  <div class="done-overlay" id="done-overlay">
+    <div class="done-card">
+      <h2>Review Complete</h2>
+      <p>Your feedback has been saved. Go back to your Claude Code session and tell Claude you're done reviewing.</p>
+      <div class="btn-row">
+        <button onclick="closeDoneDialog()">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <script>
+    // ---- Embedded data (injected by generate_review.py) ----
+    const EMBEDDED_DATA = {"skill_name": "accessibility-code", "runs": [{"id": "eval-modal-dialog-with_skill", "prompt": "I'm building a 'Confirm Trade' modal dialog in React for my fantasy football app. When the user clicks 'Propose Trade', this modal pops up showing the trade details and two buttons: 'Send Offer' and 'Cancel'. What's the fully accessible implementation? I want the right HTML structure, ARIA attributes, keyboard behavior, and focus management.", "eval_id": 0, "outputs": [{"name": "response.md", "type": "text", "content": "# Accessible \"Confirm Trade\" Modal Dialog in React\n\n## Pillars that apply\n\nThis task touches three pillars:\n- **ARIA** \u2014 role, labeling, `aria-modal`\n- **Keyboard** \u2014 focus trap, Escape to close, focus return\n- **AT Compatibility** \u2014 screen reader announcement on open, correct dialog semantics\n\n---\n\n## The right HTML element: `<dialog>`\n\nUse the native `<dialog>` element. It gives you `role=\"dialog\"` semantics, focus management hooks, and Escape-to-close behavior for free. Do not use `<div role=\"dialog\">` unless you need to support very old browsers where `<dialog>` is not available \u2014 and even then, the ARIA and keyboard work you'd have to add manually makes the native element the clearly better choice.\n\n---\n\n## Complete React Implementation\n\n```tsx\nimport { useEffect, useRef } from 'react';\n\ninterface ConfirmTradeModalProps {\n  isOpen: boolean;\n  tradeDetails: {\n    giving: string[];\n    receiving: string[];\n    leagueMate: string;\n  };\n  onConfirm: () => void;\n  onCancel: () => void;\n  triggerRef: React.RefObject<HTMLElement>; // ref to the \"Propose Trade\" button\n}\n\nexport function ConfirmTradeModal({\n  isOpen,\n  tradeDetails,\n  onConfirm,\n  onCancel,\n  triggerRef,\n}: ConfirmTradeModalProps) {\n  const dialogRef = useRef<HTMLDialogElement>(null);\n\n  // Open/close the native dialog and manage focus\n  useEffect(() => {\n    const dialog = dialogRef.current;\n    if (!dialog) return;\n\n    if (isOpen) {\n      dialog.showModal(); // opens as a modal; browser handles backdrop and focus trap\n    } else {\n      dialog.close();\n      // Return focus to the trigger when the modal closes\n      triggerRef.current?.focus();\n    }\n  }, [isOpen, triggerRef]);\n\n  // Handle Escape key \u2014 native <dialog> already fires 'cancel' on Escape,\n  // but we wire it to our onCancel so React state stays in sync.\n  useEffect(() => {\n    const dialog = dialogRef.current;\n    if (!dialog) return;\n\n    const handleCancel = (e: Event) => {\n      e.preventDefault(); // prevent the default close so React controls state\n      onCancel();\n    };\n\n    dialog.addEventListener('cancel', handleCancel);\n    return () => dialog.removeEventListener('cancel', handleCancel);\n  }, [onCancel]);\n\n  return (\n    <dialog\n      ref={dialogRef}\n      aria-labelledby=\"trade-dialog-title\"\n      aria-describedby=\"trade-dialog-desc\"\n      aria-modal=\"true\"\n    >\n      <h2 id=\"trade-dialog-title\">Confirm Trade</h2>\n\n      <p id=\"trade-dialog-desc\">\n        Review the trade details below. Clicking \"Send Offer\" will send this\n        proposal to {tradeDetails.leagueMate}.\n      </p>\n\n      <section aria-label=\"Trade details\">\n        <div>\n          <h3>You give</h3>\n          <ul>\n            {tradeDetails.giving.map((player) => (\n              <li key={player}>{player}</li>\n            ))}\n          </ul>\n        </div>\n        <div>\n          <h3>You receive</h3>\n          <ul>\n            {tradeDetails.receiving.map((player) => (\n              <li key={player}>{player}</li>\n            ))}\n          </ul>\n        </div>\n      </section>\n\n      <div>\n        {/* autofocus goes on the primary action so screen reader users\n            land on the most important control first */}\n        <button onClick={onConfirm} autoFocus>\n          Send Offer\n        </button>\n        <button onClick={onCancel}>\n          Cancel\n        </button>\n      </div>\n    </dialog>\n  );\n}\n```\n\n### Trigger button (the \"Propose Trade\" button)\n\n```tsx\nfunction TradePanel() {\n  const [modalOpen, setModalOpen] = useState(false);\n  const proposeButtonRef = useRef<HTMLButtonElement>(null);\n\n  return (\n    <>\n      <button\n        ref={proposeButtonRef}\n        onClick={() => setModalOpen(true)}\n      >\n        Propose Trade\n      </button>\n\n      <ConfirmTradeModal\n        isOpen={modalOpen}\n        tradeDetails={tradeDetails}\n        onConfirm={handleConfirm}\n        onCancel={() => setModalOpen(false)}\n        triggerRef={proposeButtonRef}\n      />\n    </>\n  );\n}\n```\n\n---\n\n## Why each decision was made\n\n### `<dialog>` with `.showModal()`\n\n`showModal()` (not `.show()`) opens the dialog as a true modal. The browser:\n- Creates a top-layer context so the dialog sits above all other content\n- Traps focus inside automatically (no manual focus trap loop needed)\n- Fires a `cancel` event on Escape\n\nThis eliminates the need to write a manual focus trap. If you used `.show()` or just rendered the element without calling either method, you'd get no focus trapping and would need to implement it yourself (see the focus trap snippet in the keyboard reference).\n\n### `aria-labelledby` + `aria-describedby`\n\n- `aria-labelledby=\"trade-dialog-title\"` points at the `<h2>`. Screen readers announce this as the dialog's name when focus enters: \"Confirm Trade, dialog.\"\n- `aria-describedby=\"trade-dialog-desc\"` provides the supplementary description. Screen readers read it after the title, giving context without requiring the user to navigate into the content first.\n- Use `aria-labelledby` (not `aria-label`) because the text is already visible on screen \u2014 referencing it is semantically cleaner and keeps the label in sync automatically if the heading text changes.\n\n### `aria-modal=\"true\"`\n\nEven with the native `<dialog>` element, `aria-modal=\"true\"` is needed to tell screen readers that content outside the dialog is inert. Without it, some screen readers (particularly older NVDA + Firefox combinations) let users wander out of the dialog using virtual cursor navigation (arrow keys / browse mode), bypassing the visual modal completely.\n\n### `autoFocus` on \"Send Offer\"\n\nThe ARIA Authoring Practices Guide recommends moving focus to the first focusable element inside the dialog. \"Send Offer\" is the primary action and the first interactive element, so placing `autoFocus` there is correct. This also means the screen reader immediately announces the button, confirming to the user that the dialog has opened.\n\nAn alternative: move focus to the `<dialog>` element itself (by adding `tabindex=\"-1\"` to it and calling `.focus()` on the ref). This makes the screen reader announce the dialog title and description before any button, which can be useful when the trade details are complex and you want the user to absorb them before being prompted to act. Either approach is valid; `autoFocus` on the button is the more common pattern.\n\n### Focus return on close\n\nBoth \"Send Offer\" and \"Cancel\" ultimately call `onCancel` or `onConfirm`, which set `isOpen` to false. The `useEffect` watching `isOpen` then fires `triggerRef.current?.focus()`. This returns focus to the \"Propose Trade\" button, exactly where the user was before the dialog opened. Without this, focus lands on `<body>` and keyboard users lose their place in the page.\n\n### Escape key handling\n\nThe native `<dialog>` fires a `cancel` event on Escape. We intercept it with `e.preventDefault()` and call `onCancel()` instead. This keeps React state authoritative \u2014 without `preventDefault`, the browser would close the native dialog directly, leaving `isOpen` as `true` and causing a stale state mismatch.\n\n---\n\n## What NOT to do\n\n**Do not implement a manual focus trap if you're using `showModal()`.**  \nThe browser already traps focus. Adding your own `keydown` listener on top creates duplicate behavior and can cause bugs (e.g., double-trapping, preventing legitimate Tab behavior inside the modal).\n\n**Do not use `<div role=\"dialog\">` unless you have a hard browser-support constraint.**  \nYou'd need to: add `aria-modal=\"true\"`, manage focus on open and close yourself, write a focus trap, handle Escape manually, and add `inert` or `aria-hidden` to everything outside the dialog. The `<dialog>` element does all of this with two lines.\n\n**Do not use `aria-label` when visible text already exists.**  \n`aria-label` creates a disconnect between what's visible and what's announced. If the heading text ever changes, `aria-label` silently becomes stale. Use `aria-labelledby` pointing at the visible heading instead.\n\n**Do not put `autoFocus` on \"Cancel\".**  \nDefaulting focus to the destructive or dismissive action means a distracted user pressing Enter or Space immediately cancels. Put `autoFocus` on the primary/safe action.\n\n---\n\n## WCAG criteria covered\n\n| Criterion | How it's met |\n|---|---|\n| 1.3.1 Info and Relationships | `<dialog>`, `<h2>`, `<h3>`, `<ul>` convey structure semantically |\n| 2.1.1 Keyboard | All controls reachable and operable by keyboard; Escape closes |\n| 2.1.2 No Keyboard Trap | Focus is intentionally trapped while modal is open (the spec allows this); Escape provides the exit |\n| 2.4.3 Focus Order | Focus enters the dialog on open, is trapped inside, returns to trigger on close |\n| 4.1.2 Name, Role, Value | `aria-labelledby`, `aria-describedby`, `aria-modal` fully describe the dialog; buttons are native `<button>` elements |\n"}], "grading": {"eval_id": 0, "eval_name": "modal-dialog", "configuration": "with_skill", "expectations": [{"text": "Recommends <dialog> element OR role='dialog' with aria-modal='true'", "passed": true, "evidence": "Explicitly recommends native <dialog> element with .showModal() and explains why it's preferred over <div role='dialog'>"}, {"text": "Mentions aria-labelledby pointing to the dialog title", "passed": true, "evidence": "Uses aria-labelledby='trade-dialog-title' pointing at the <h2> and explains why aria-labelledby is preferred over aria-label"}, {"text": "Covers focus trap \u2014 focus cycles within the modal", "passed": true, "evidence": "Notes that showModal() handles focus trapping automatically; explains not to add manual trap on top"}, {"text": "Mentions moving focus INTO the dialog on open", "passed": true, "evidence": "Uses autoFocus on Send Offer button; explains the rationale and alternate approach of focusing the dialog element itself"}, {"text": "Mentions returning focus to trigger element on close", "passed": true, "evidence": "Passes triggerRef and calls triggerRef.current?.focus() in useEffect watching isOpen"}, {"text": "Covers Escape key closing the dialog", "passed": true, "evidence": "Intercepts the native 'cancel' event with preventDefault and calls onCancel(); explains why preventDefault is needed"}, {"text": "Provides working code (not just description)", "passed": true, "evidence": "Full TypeScript React component with props interface, useEffect hooks, and usage example"}]}}, {"id": "eval-modal-dialog-without_skill", "prompt": "I'm building a 'Confirm Trade' modal dialog in React for my fantasy football app. When the user clicks 'Propose Trade', this modal pops up showing the trade details and two buttons: 'Send Offer' and 'Cancel'. What's the fully accessible implementation? I want the right HTML structure, ARIA attributes, keyboard behavior, and focus management.", "eval_id": 0, "outputs": [{"name": "response.md", "type": "text", "content": "# Accessible \"Confirm Trade\" Modal Dialog in React\n\n## Overview\n\nA modal dialog that is fully accessible requires four things working together:\n1. Correct HTML/ARIA structure so screen readers understand what they're looking at\n2. Focus management so keyboard users can interact with it\n3. Keyboard behavior matching the ARIA Authoring Practices Guide (APG) dialog pattern\n4. Background inertness so users cannot accidentally interact with content behind the modal\n\n---\n\n## Complete Implementation\n\n```jsx\nimport { useEffect, useRef } from \"react\";\nimport { createPortal } from \"react-dom\";\n\nfunction ConfirmTradeModal({ isOpen, tradeDetails, onConfirm, onCancel }) {\n  const dialogRef = useRef(null);\n  const cancelButtonRef = useRef(null);\n\n  // Focus management: move focus into the modal when it opens\n  useEffect(() => {\n    if (isOpen) {\n      // Small timeout ensures the DOM has rendered before we shift focus\n      const id = setTimeout(() => {\n        cancelButtonRef.current?.focus();\n      }, 0);\n      return () => clearTimeout(id);\n    }\n  }, [isOpen]);\n\n  // Keyboard behavior: trap focus inside dialog, close on Escape\n  useEffect(() => {\n    if (!isOpen) return;\n\n    function handleKeyDown(e) {\n      if (e.key === \"Escape\") {\n        onCancel();\n        return;\n      }\n\n      if (e.key === \"Tab\") {\n        const dialog = dialogRef.current;\n        if (!dialog) return;\n\n        // Find all focusable elements inside the dialog\n        const focusableSelectors = [\n          \"a[href]\",\n          \"button:not([disabled])\",\n          \"input:not([disabled])\",\n          \"select:not([disabled])\",\n          \"textarea:not([disabled])\",\n          '[tabindex]:not([tabindex=\"-1\"])',\n        ].join(\", \");\n\n        const focusableElements = Array.from(\n          dialog.querySelectorAll(focusableSelectors)\n        );\n\n        if (focusableElements.length === 0) return;\n\n        const firstElement = focusableElements[0];\n        const lastElement = focusableElements[focusableElements.length - 1];\n\n        if (e.shiftKey) {\n          // Shift+Tab: if focus is on the first element, wrap to last\n          if (document.activeElement === firstElement) {\n            e.preventDefault();\n            lastElement.focus();\n          }\n        } else {\n          // Tab: if focus is on the last element, wrap to first\n          if (document.activeElement === lastElement) {\n            e.preventDefault();\n            firstElement.focus();\n          }\n        }\n      }\n    }\n\n    document.addEventListener(\"keydown\", handleKeyDown);\n    return () => document.removeEventListener(\"keydown\", handleKeyDown);\n  }, [isOpen, onCancel]);\n\n  if (!isOpen) return null;\n\n  return createPortal(\n    <>\n      {/* Backdrop: visible overlay, clicking it cancels the dialog */}\n      <div\n        className=\"modal-backdrop\"\n        onClick={onCancel}\n        aria-hidden=\"true\"\n      />\n\n      {/* The dialog itself */}\n      <div\n        role=\"dialog\"\n        aria-modal=\"true\"\n        aria-labelledby=\"trade-dialog-title\"\n        aria-describedby=\"trade-dialog-desc\"\n        ref={dialogRef}\n        className=\"modal-dialog\"\n      >\n        <h2 id=\"trade-dialog-title\">Confirm Trade</h2>\n\n        <div id=\"trade-dialog-desc\">\n          <p>Please review the trade details below before sending your offer.</p>\n\n          <div className=\"trade-details\">\n            <div className=\"trade-side\">\n              <h3>You give:</h3>\n              <ul>\n                {tradeDetails.giving.map((player) => (\n                  <li key={player.id}>{player.name} ({player.position})</li>\n                ))}\n              </ul>\n            </div>\n            <div className=\"trade-side\">\n              <h3>You receive:</h3>\n              <ul>\n                {tradeDetails.receiving.map((player) => (\n                  <li key={player.id}>{player.name} ({player.position})</li>\n                ))}\n              </ul>\n            </div>\n          </div>\n        </div>\n\n        {/* Action buttons */}\n        <div className=\"modal-actions\" role=\"group\" aria-label=\"Trade actions\">\n          <button\n            type=\"button\"\n            onClick={onConfirm}\n            className=\"btn-primary\"\n          >\n            Send Offer\n          </button>\n          <button\n            type=\"button\"\n            onClick={onCancel}\n            ref={cancelButtonRef}\n            className=\"btn-secondary\"\n          >\n            Cancel\n          </button>\n        </div>\n      </div>\n    </>,\n    document.body\n  );\n}\n```\n\n---\n\n## Usage Example\n\n```jsx\nfunction TradeProposal() {\n  const [modalOpen, setModalOpen] = useState(false);\n\n  const tradeDetails = {\n    giving: [{ id: 1, name: \"Justin Jefferson\", position: \"WR\" }],\n    receiving: [{ id: 2, name: \"Tyreek Hill\", position: \"WR\" }],\n  };\n\n  function handleProposeTrade() {\n    setModalOpen(true);\n  }\n\n  function handleSendOffer() {\n    // submit trade logic here\n    setModalOpen(false);\n  }\n\n  function handleCancel() {\n    setModalOpen(false);\n    // Return focus to the trigger button \u2014 see note below\n  }\n\n  return (\n    <div>\n      <button type=\"button\" onClick={handleProposeTrade}>\n        Propose Trade\n      </button>\n\n      <ConfirmTradeModal\n        isOpen={modalOpen}\n        tradeDetails={tradeDetails}\n        onConfirm={handleSendOffer}\n        onCancel={handleCancel}\n      />\n    </div>\n  );\n}\n```\n\n---\n\n## Key Decisions Explained\n\n### 1. ARIA Attributes\n\n| Attribute | Element | Why |\n|-----------|---------|-----|\n| `role=\"dialog\"` | Container div | Tells assistive technology this is a dialog. Screen readers announce it as such when focus moves in. |\n| `aria-modal=\"true\"` | Container div | Signals to modern screen readers that content outside the dialog is inert. Not a substitute for real DOM inertness (see below), but required for proper screen reader behavior. |\n| `aria-labelledby=\"trade-dialog-title\"` | Container div | Associates the `<h2>` as the dialog's accessible name. Screen readers announce the heading when the dialog opens. |\n| `aria-describedby=\"trade-dialog-desc\"` | Container div | Associates the descriptive content as the dialog's accessible description. Some screen readers read this automatically after the label. |\n| `aria-hidden=\"true\"` | Backdrop div | Prevents the decorative backdrop from being announced or focused by screen readers. |\n\n### 2. Focus Management\n\n**On open:** Focus moves to the Cancel button (not Send Offer) as the initial focus target. This is intentional \u2014 it's the safer, more conservative action. Placing focus on a destructive or irreversible action (\"Send Offer\") as the default risks accidental activation by screen reader users or keyboard-only users who press Space or Enter immediately after the modal opens.\n\n**On close:** Focus must return to the element that triggered the modal (the \"Propose Trade\" button). Without this, keyboard users lose their place in the page. Implement this by storing a ref to the trigger button and calling `.focus()` on it when the modal closes:\n\n```jsx\nconst triggerRef = useRef(null);\n\nfunction handleProposeTrade() {\n  setModalOpen(true);\n}\n\nfunction handleClose() {\n  setModalOpen(false);\n  // Return focus to the trigger after state updates\n  setTimeout(() => triggerRef.current?.focus(), 0);\n}\n\n// In JSX:\n<button type=\"button\" ref={triggerRef} onClick={handleProposeTrade}>\n  Propose Trade\n</button>\n```\n\n### 3. Focus Trap\n\nThe Tab and Shift+Tab behavior cycles focus within the dialog. Without this, Tab from the last button would move focus to the browser's address bar or other browser UI, leaving the modal visually present but functionally abandoned for keyboard users \u2014 a disorienting experience.\n\nThe implementation queries all focusable elements dynamically, which correctly handles conditionally rendered content inside the modal.\n\n### 4. Escape Key\n\nPressing Escape closes the modal (calling `onCancel`). This is required by the ARIA APG dialog pattern and is the expected behavior users have learned from native OS dialogs. It should behave identically to clicking Cancel.\n\n### 5. Background Inertness\n\n`aria-modal=\"true\"` helps screen readers, but browsers do not enforce DOM inertness based on ARIA alone. Without additional measures, keyboard users can Tab out of the modal into background content, and screen readers with virtual cursor modes (like NVDA in browse mode) can read background content.\n\n**Modern approach \u2014 the `inert` attribute:**\n\n```jsx\nuseEffect(() => {\n  if (!isOpen) return;\n\n  // Make everything outside the modal inert\n  const siblings = Array.from(document.body.children).filter(\n    (el) => !el.contains(dialogRef.current) && el !== dialogRef.current\n  );\n  siblings.forEach((el) => el.setAttribute(\"inert\", \"\"));\n  return () => siblings.forEach((el) => el.removeAttribute(\"inert\"));\n}, [isOpen]);\n```\n\nThe `inert` attribute (now baseline-available in all modern browsers) prevents focus, pointer events, and screen reader access to the marked elements. This is the most robust solution and eliminates the need for complex aria-hidden trees on background content.\n\n**Alternative:** Libraries like `focus-trap-react` handle this well if you prefer not to implement it manually.\n\n### 6. Portal Rendering\n\n`createPortal(children, document.body)` renders the modal as a direct child of `<body>`, outside your React component tree's DOM position. This matters because:\n- CSS stacking context issues (`z-index` conflicts) are avoided\n- The modal won't be clipped by `overflow: hidden` ancestors\n- Screen readers encounter the dialog at the top level of the document, which matches the expected document structure for dialogs\n\n### 7. Heading Structure\n\nThe `<h2>` inside the dialog gives the dialog its accessible name via `aria-labelledby`. Using a real heading element (rather than a styled `<div>`) also gives screen reader users navigating by headings a way to jump to the dialog title.\n\nThe nested `<h3>` elements (\"You give:\" / \"You receive:\") are appropriate since they are subheadings within the dialog's content.\n\n---\n\n## CSS Considerations\n\n```css\n/* Backdrop */\n.modal-backdrop {\n  position: fixed;\n  inset: 0;\n  background: rgba(0, 0, 0, 0.5);\n  z-index: 100;\n}\n\n/* Dialog */\n.modal-dialog {\n  position: fixed;\n  top: 50%;\n  left: 50%;\n  transform: translate(-50%, -50%);\n  z-index: 101;\n  background: white;\n  border-radius: 8px;\n  padding: 24px;\n  max-width: 500px;\n  width: 90%;\n  /* Critical: ensure the dialog is visible in high-contrast mode */\n  border: 2px solid transparent;\n}\n\n/* Ensure focus indicators are visible */\n.modal-dialog button:focus-visible {\n  outline: 3px solid #005fcc;\n  outline-offset: 2px;\n}\n\n/* Respect reduced motion preferences */\n@media (prefers-reduced-motion: reduce) {\n  .modal-dialog {\n    animation: none;\n    transition: none;\n  }\n}\n```\n\nDo not use `outline: none` on focused buttons inside the dialog. Focus indicators are required for keyboard accessibility (WCAG 2.4.7, Success Criterion level AA).\n\n---\n\n## Testing Checklist\n\n- [ ] **Screen reader announcement:** When the modal opens, NVDA/JAWS/VoiceOver announces the dialog role, title (\"Confirm Trade\"), and description\n- [ ] **Initial focus:** First focused element after open is the Cancel button\n- [ ] **Tab cycling:** Tab from Cancel goes to Send Offer; Tab from Send Offer goes back to Cancel\n- [ ] **Shift+Tab cycling:** Works in reverse\n- [ ] **Escape closes modal:** Focus returns to \"Propose Trade\" button\n- [ ] **Cancel closes modal:** Focus returns to \"Propose Trade\" button\n- [ ] **Send Offer submits:** Appropriate action fires, modal closes, focus returns\n- [ ] **Background inertness:** Cannot Tab into background content while modal is open\n- [ ] **No background reads:** Screen reader virtual cursor cannot reach background content\n- [ ] **Focus indicator visible:** All focused buttons have clearly visible outlines\n- [ ] **Color contrast:** Dialog text meets 4.5:1 contrast ratio (WCAG 1.4.3 AA)\n- [ ] **Reduced motion:** No jarring animations if user has `prefers-reduced-motion: reduce` set\n\n---\n\n## WCAG Success Criteria Addressed\n\n| Criterion | Level | How |\n|-----------|-------|-----|\n| 1.3.1 Info and Relationships | A | Semantic HTML (`role=\"dialog\"`, headings, lists) |\n| 1.4.3 Contrast (Minimum) | AA | Ensure sufficient text/button contrast |\n| 2.1.1 Keyboard | A | Full keyboard operability, Tab trap, Escape |\n| 2.1.2 No Keyboard Trap | A | Focus trap is intentional and escapable via Escape/Cancel |\n| 2.4.3 Focus Order | A | Logical focus order within dialog |\n| 2.4.7 Focus Visible | AA | Visible focus indicators on all interactive elements |\n| 4.1.2 Name, Role, Value | A | `role=\"dialog\"`, `aria-labelledby`, `aria-describedby`, `aria-modal` |\n\n---\n\n## Libraries Worth Knowing\n\nIf you want a battle-tested baseline instead of rolling your own:\n\n- **Radix UI Dialog** (`@radix-ui/react-dialog`) \u2014 unstyled, fully accessible, handles focus trap, Escape, aria attributes, and portal rendering out of the box\n- **React Aria** (`@react-aria/dialog`) \u2014 Adobe's accessibility library, extremely thorough ARIA implementation\n- **Headless UI** (`@headlessui/react`) \u2014 Tailwind team's accessible primitives, includes a Dialog component\n\nThese are worth using in production because they handle edge cases (e.g., nested dialogs, scroll locking, iOS Safari quirks) that are tedious to implement correctly from scratch.\n"}], "grading": {"eval_id": 0, "eval_name": "modal-dialog", "configuration": "without_skill", "expectations": [{"text": "Recommends <dialog> element OR role='dialog' with aria-modal='true'", "passed": true, "evidence": "Uses <div role='dialog' aria-modal='true'> \u2014 valid but not the native <dialog> element. Does not recommend the native element."}, {"text": "Mentions aria-labelledby pointing to the dialog title", "passed": true, "evidence": "Uses aria-labelledby='trade-dialog-title' pointing at <h2>"}, {"text": "Covers focus trap \u2014 focus cycles within the modal", "passed": true, "evidence": "Implements manual focus trap with querySelectorAll of focusable elements and Tab key interception"}, {"text": "Mentions moving focus INTO the dialog on open", "passed": true, "evidence": "useEffect with setTimeout moves focus to cancelButtonRef on open"}, {"text": "Mentions returning focus to trigger element on close", "passed": true, "evidence": "Mentioned in a separate code note but not wired in main component \u2014 requires extra work from reader to implement"}, {"text": "Covers Escape key closing the dialog", "passed": true, "evidence": "handleKeyDown checks for Escape key and calls onCancel()"}, {"text": "Provides working code (not just description)", "passed": true, "evidence": "Full JSX component with createPortal, focus trap, keyboard handler"}]}}, {"id": "eval-custom-dropdown-with_skill", "prompt": "I have a custom player search combobox in my dynasty app \u2014 it's a text input that filters a list of players as you type, and you can click a player to add them to your roster. Right now it's just a plain <input> and a <ul> that appears below it. A screen reader user told me it's completely unusable. How do I fix it?", "eval_id": 1, "outputs": [{"name": "response.md", "type": "text", "content": "# Fixing Your Custom Player Search Combobox for Screen Readers\n\nYour component is a classic combobox (autocomplete) pattern \u2014 a text input that controls a filtered list. Right now it's two disconnected elements with no semantics, so screen readers have no way to understand the relationship between the input and the list, know that the list exists, navigate into it, or announce the currently highlighted option.\n\nHere is exactly what to fix.\n\n---\n\n## Pillars involved\n\n- **ARIA** \u2014 combobox role, listbox/option roles, states (aria-expanded, aria-activedescendant, aria-autocomplete)\n- **Keyboard** \u2014 Down arrow enters list, Enter selects, Escape dismisses, Up/Down navigate options\n- **AT Compatibility** \u2014 screen readers need all three of the above to work together\n\n---\n\n## What is wrong with the current markup\n\nA plain `<input>` and a `<ul>` are invisible to assistive technology as a combined widget. Screen readers will:\n\n- Read the input as a generic text field with no hint that a list exists\n- Not announce when the list appears or disappears\n- Not announce which option is highlighted as you arrow through the list\n- Give no indication that clicking an item adds a player to the roster\n\n---\n\n## The fix: implement the APG combobox pattern\n\nThis is the correct WCAG-compliant markup (WCAG 4.1.2 \u2014 Name, Role, Value; plus the ARIA combobox pattern):\n\n```html\n<!-- 1. Label the input with a visible <label> -->\n<label for=\"player-search\">Search players</label>\n\n<!-- 2. The input gets role=\"combobox\" plus state attributes -->\n<input\n  id=\"player-search\"\n  type=\"text\"\n  role=\"combobox\"\n  aria-expanded=\"false\"\n  aria-autocomplete=\"list\"\n  aria-controls=\"player-listbox\"\n  aria-activedescendant=\"\"\n  autocomplete=\"off\"\n/>\n\n<!-- 3. The list gets role=\"listbox\"; each item gets role=\"option\" with a unique id -->\n<ul\n  id=\"player-listbox\"\n  role=\"listbox\"\n  aria-label=\"Player suggestions\"\n  hidden\n>\n  <li role=\"option\" id=\"player-opt-1\" aria-selected=\"false\">Justin Jefferson</li>\n  <li role=\"option\" id=\"player-opt-2\" aria-selected=\"false\">CeeDee Lamb</li>\n  <li role=\"option\" id=\"player-opt-3\" aria-selected=\"false\">Ja'Marr Chase</li>\n</ul>\n\n<!-- 4. A live region to announce result count (polite) -->\n<div aria-live=\"polite\" aria-atomic=\"true\" class=\"sr-only\" id=\"search-status\"></div>\n```\n\n---\n\n## Attribute-by-attribute explanation\n\n| Attribute | Where | What it does |\n|---|---|---|\n| `role=\"combobox\"` | `<input>` | Tells screen readers this input controls a popup list |\n| `aria-expanded=\"false\"/\"true\"` | `<input>` | Announces whether the list is open. Update this in JS when the list appears/disappears |\n| `aria-autocomplete=\"list\"` | `<input>` | Tells AT that the input filters a list (not inline completion) |\n| `aria-controls=\"player-listbox\"` | `<input>` | Links the input to the listbox by ID |\n| `aria-activedescendant=\"player-opt-N\"` | `<input>` | Points to the currently highlighted option's ID. Screen readers announce this option when it changes. Set to `\"\"` when nothing is highlighted |\n| `role=\"listbox\"` | `<ul>` | Makes the list a proper listbox popup |\n| `role=\"option\"` | each `<li>` | Makes each item a selectable option |\n| `aria-selected=\"false\"/\"true\"` | each `<li>` | Indicates selection state; set to `\"true\"` on the highlighted/selected item |\n| `hidden` | `<ul>` | Hides the list from both visual users and AT when closed; remove the attribute (don't just `display:none` via CSS) when opening |\n\n---\n\n## Required keyboard behavior\n\nPer the ARIA Authoring Practices Guide combobox pattern:\n\n| Key | Behavior |\n|---|---|\n| Any character | Filters the list; opens listbox if closed |\n| `Down Arrow` | If list is closed, opens it. Moves virtual focus to first option |\n| `Up Arrow` | Moves virtual focus to previous option |\n| `Enter` | Selects the focused option, adds player to roster, closes list, returns focus to input |\n| `Escape` | Closes list without selecting, returns to input |\n| `Tab` | Closes list, moves focus to next element in page |\n\n\"Virtual focus\" here means: visual highlight on the `<li>`, with `aria-activedescendant` on the `<input>` updated to that option's ID. **Real focus never leaves the input.** This is the key technique \u2014 do not move `focus()` into the listbox.\n\n---\n\n## JavaScript wiring\n\n```js\nconst input = document.getElementById('player-search');\nconst listbox = document.getElementById('player-listbox');\nconst status = document.getElementById('search-status');\nlet activeIndex = -1;\n\nfunction getOptions() {\n  return Array.from(listbox.querySelectorAll('[role=\"option\"]'));\n}\n\nfunction openList() {\n  listbox.removeAttribute('hidden');\n  input.setAttribute('aria-expanded', 'true');\n}\n\nfunction closeList() {\n  listbox.setAttribute('hidden', '');\n  input.setAttribute('aria-expanded', 'false');\n  input.setAttribute('aria-activedescendant', '');\n  activeIndex = -1;\n  clearHighlight();\n}\n\nfunction clearHighlight() {\n  getOptions().forEach(opt => {\n    opt.setAttribute('aria-selected', 'false');\n    opt.classList.remove('highlighted');\n  });\n}\n\nfunction setActiveOption(index) {\n  const options = getOptions();\n  if (index < 0 || index >= options.length) return;\n  clearHighlight();\n  activeIndex = index;\n  const opt = options[index];\n  opt.setAttribute('aria-selected', 'true');\n  opt.classList.add('highlighted');\n  input.setAttribute('aria-activedescendant', opt.id);\n}\n\nfunction selectOption(index) {\n  const options = getOptions();\n  const opt = options[index];\n  if (!opt) return;\n  addPlayerToRoster(opt.textContent); // your existing add logic\n  input.value = '';\n  closeList();\n  // Optionally announce the selection\n  status.textContent = `${opt.textContent} added to roster.`;\n}\n\n// Filter on input\ninput.addEventListener('input', () => {\n  const query = input.value.trim().toLowerCase();\n  filterPlayers(query); // your existing filter logic \u2014 updates the <li> list\n  if (query.length > 0) {\n    openList();\n    const count = getOptions().length;\n    status.textContent = count === 0\n      ? 'No players found.'\n      : `${count} player${count !== 1 ? 's' : ''} found.`;\n  } else {\n    closeList();\n    status.textContent = '';\n  }\n  activeIndex = -1;\n  input.setAttribute('aria-activedescendant', '');\n});\n\n// Keyboard navigation\ninput.addEventListener('keydown', (e) => {\n  const options = getOptions();\n  switch (e.key) {\n    case 'ArrowDown':\n      e.preventDefault();\n      if (listbox.hasAttribute('hidden')) openList();\n      setActiveOption(Math.min(activeIndex + 1, options.length - 1));\n      break;\n    case 'ArrowUp':\n      e.preventDefault();\n      setActiveOption(Math.max(activeIndex - 1, 0));\n      break;\n    case 'Enter':\n      e.preventDefault();\n      if (activeIndex >= 0) selectOption(activeIndex);\n      break;\n    case 'Escape':\n      closeList();\n      break;\n    case 'Tab':\n      closeList();\n      break;\n  }\n});\n\n// Click to select\nlistbox.addEventListener('click', (e) => {\n  const opt = e.target.closest('[role=\"option\"]');\n  if (!opt) return;\n  const index = getOptions().indexOf(opt);\n  selectOption(index);\n  input.focus();\n});\n\n// Close on outside click\ndocument.addEventListener('click', (e) => {\n  if (!input.contains(e.target) && !listbox.contains(e.target)) {\n    closeList();\n  }\n});\n```\n\n---\n\n## The live region for result count\n\nScreen readers do not automatically announce that a list appeared. The `aria-live=\"polite\"` region in the markup above handles this. Update it after filtering:\n\n```js\nstatus.textContent = `${count} player${count !== 1 ? 's' : ''} found.`;\n```\n\nThis announces \"3 players found\" without moving focus away from the input. This satisfies WCAG 4.1.3 (Status Messages).\n\n---\n\n## CSS: make the highlighted option visually obvious\n\n```css\n[role=\"option\"].highlighted,\n[role=\"option\"]:hover {\n  background-color: #1a56db;\n  color: white;\n  outline: 2px solid #1a56db; /* ensure it's not just color-only */\n}\n```\n\nDo not rely solely on background color to indicate highlight \u2014 add an outline or border (WCAG 1.4.1 \u2014 Use of Color).\n\n---\n\n## What NOT to do\n\n- **Do not move focus into the listbox.** Focus stays on the input. Use `aria-activedescendant` to track virtual focus. Moving real focus into the list breaks typing.\n- **Do not use `role=\"menu\"` / `role=\"menuitem\"`.** Menu is for application action menus (like a right-click context menu), not for filtering search results. Use `listbox`/`option`.\n- **Do not hide the listbox with `visibility: hidden` or `opacity: 0`.** Hidden elements need to be fully removed from the accessibility tree when closed. Use `hidden` attribute or `display: none`.\n- **Do not skip the `<label>`.** An `aria-label` on the input is acceptable as a fallback, but a visible `<label>` is better \u2014 it also helps voice control users who say \"click Search players\" to target the field.\n\n---\n\n## Testing checklist\n\nAfter implementing:\n\n- [ ] Tab to the input \u2014 VoiceOver/NVDA should announce \"Search players, combobox\"\n- [ ] Type a query \u2014 hear the result count announced\n- [ ] Press Down Arrow \u2014 hear the first option announced (e.g., \"Justin Jefferson, 1 of 3\")\n- [ ] Press Down Arrow again \u2014 hear next option\n- [ ] Press Enter \u2014 player is added, list closes, focus returns to input\n- [ ] Press Escape \u2014 list closes without adding anyone\n- [ ] Click a player with the mouse \u2014 same result as Enter\n- [ ] Test on NVDA + Chrome (Windows) and VoiceOver + Safari (macOS)\n\n---\n\n## WCAG criteria addressed\n\n| Criterion | Level | How |\n|---|---|---|\n| 1.3.1 Info and Relationships | A | `role=\"combobox\"`, `role=\"listbox\"`, `role=\"option\"` convey structure |\n| 1.4.1 Use of Color | A | Highlight uses outline, not just background color |\n| 2.1.1 Keyboard | A | Full keyboard navigation per APG combobox pattern |\n| 4.1.2 Name, Role, Value | A | Input labeled, roles set, states (`aria-expanded`, `aria-selected`, `aria-activedescendant`) updated dynamically |\n| 4.1.3 Status Messages | AA | Live region announces result count without moving focus |\n"}], "grading": {"eval_id": 1, "eval_name": "custom-dropdown", "configuration": "with_skill", "expectations": [{"text": "Adds role='combobox' to the input or wrapping element", "passed": true, "evidence": "role='combobox' placed on the <input> element with full explanation"}, {"text": "Includes aria-expanded to reflect open/closed state", "passed": true, "evidence": "aria-expanded='false'/'true' included on input with instruction to update in JS"}, {"text": "Includes aria-controls pointing to the listbox", "passed": true, "evidence": "aria-controls='player-listbox' links input to the <ul>"}, {"text": "Adds role='listbox' to the results list", "passed": true, "evidence": "role='listbox' on <ul> with id='player-listbox'"}, {"text": "Adds role='option' to each result item", "passed": true, "evidence": "role='option' on each <li> with unique ids"}, {"text": "Mentions aria-activedescendant for tracking highlighted option", "passed": true, "evidence": "aria-activedescendant explained in detail with the key insight that real focus never leaves the input"}, {"text": "Covers keyboard pattern: arrows to navigate, Enter to select, Escape to close", "passed": true, "evidence": "Full keyboard table: Down/Up arrows, Enter to select, Escape to close, Tab behavior"}, {"text": "Mentions the input needs a <label>", "passed": true, "evidence": "First line of fix is adding a visible <label for='player-search'>"}]}}, {"id": "eval-custom-dropdown-without_skill", "prompt": "I have a custom player search combobox in my dynasty app \u2014 it's a text input that filters a list of players as you type, and you can click a player to add them to your roster. Right now it's just a plain <input> and a <ul> that appears below it. A screen reader user told me it's completely unusable. How do I fix it?", "eval_id": 1, "outputs": [{"name": "response.md", "type": "text", "content": "# Making a Custom Player Search Combobox Accessible\n\nA screen reader user is right \u2014 a plain `<input>` and `<ul>` combo with no ARIA attributes is essentially invisible to assistive technology. The browser has no idea these two elements are related, that the list is a set of selectable options, or what state the widget is in. Here is how to fix it completely.\n\n---\n\n## The Core Problem\n\nScreen readers rely on semantic HTML and ARIA roles to understand UI. Your current widget looks like:\n- An unlabeled text box\n- A random list somewhere on the page\n\nThe screen reader cannot tell the user: \"This input controls a dropdown of player options,\" \"There are 12 results,\" \"You are on result 3 of 12,\" or \"Press Enter to select.\"\n\n---\n\n## The Fix: ARIA Combobox Pattern\n\nThe WAI-ARIA spec defines an explicit **combobox pattern** for exactly this use case. Here is the complete implementation.\n\n### 1. HTML Structure\n\n```html\n<label for=\"player-search\">Search players</label>\n\n<div class=\"combobox-wrapper\">\n  <input\n    type=\"text\"\n    id=\"player-search\"\n    role=\"combobox\"\n    aria-expanded=\"false\"\n    aria-autocomplete=\"list\"\n    aria-controls=\"player-listbox\"\n    aria-activedescendant=\"\"\n    autocomplete=\"off\"\n    spellcheck=\"false\"\n  />\n\n  <ul\n    id=\"player-listbox\"\n    role=\"listbox\"\n    aria-label=\"Players\"\n    hidden\n  >\n    <!-- Options injected by JS -->\n    <li role=\"option\" id=\"option-1\" aria-selected=\"false\">Patrick Mahomes</li>\n    <li role=\"option\" id=\"option-2\" aria-selected=\"false\">Justin Jefferson</li>\n    <!-- etc. -->\n  </ul>\n</div>\n```\n\n**Key attributes explained:**\n\n| Attribute | Where | Purpose |\n|---|---|---|\n| `role=\"combobox\"` | input | Tells screen readers this input controls a popup list |\n| `aria-expanded` | input | \"false\" when list is hidden, \"true\" when visible |\n| `aria-controls` | input | Points to the listbox element by ID |\n| `aria-autocomplete=\"list\"` | input | Tells screen readers suggestions appear in a list |\n| `aria-activedescendant` | input | ID of the currently highlighted option (keyboard nav) |\n| `role=\"listbox\"` | ul | Identifies the popup as a selectable list |\n| `role=\"option\"` | li | Each item is a selectable option |\n| `aria-selected` | li | \"true\" on the currently focused/highlighted option |\n| `hidden` | ul | Native HTML attribute to hide the list (better than CSS-only) |\n\n\n### 2. JavaScript \u2014 The Full Behavior\n\n```javascript\nconst input = document.getElementById('player-search');\nconst listbox = document.getElementById('player-listbox');\nlet activeIndex = -1;\nlet filteredPlayers = [];\n\n// --- Filtering ---\ninput.addEventListener('input', () => {\n  const query = input.value.trim().toLowerCase();\n  activeIndex = -1;\n  input.setAttribute('aria-activedescendant', '');\n\n  if (query.length === 0) {\n    closeListbox();\n    return;\n  }\n\n  filteredPlayers = allPlayers.filter(p =>\n    p.name.toLowerCase().includes(query)\n  );\n\n  renderOptions(filteredPlayers);\n\n  if (filteredPlayers.length > 0) {\n    openListbox();\n  } else {\n    closeListbox();\n    // Optional: announce no results\n    announceToScreenReader('No players found.');\n  }\n});\n\n// --- Render options ---\nfunction renderOptions(players) {\n  listbox.innerHTML = '';\n  players.forEach((player, i) => {\n    const li = document.createElement('li');\n    li.setAttribute('role', 'option');\n    li.setAttribute('id', `option-${i}`);\n    li.setAttribute('aria-selected', 'false');\n    li.textContent = `${player.name} \u2014 ${player.position}, ${player.team}`;\n    li.addEventListener('mousedown', (e) => {\n      // mousedown instead of click so it fires before input blur\n      e.preventDefault();\n      selectPlayer(i);\n    });\n    listbox.appendChild(li);\n  });\n}\n\n// --- Open / close ---\nfunction openListbox() {\n  listbox.removeAttribute('hidden');\n  input.setAttribute('aria-expanded', 'true');\n}\n\nfunction closeListbox() {\n  listbox.setAttribute('hidden', '');\n  input.setAttribute('aria-expanded', 'false');\n  input.setAttribute('aria-activedescendant', '');\n  activeIndex = -1;\n  clearOptionSelection();\n}\n\ninput.addEventListener('blur', () => {\n  // Small delay so mousedown on an option can fire first\n  setTimeout(closeListbox, 150);\n});\n\n// --- Keyboard navigation ---\ninput.addEventListener('keydown', (e) => {\n  const optionCount = filteredPlayers.length;\n\n  switch (e.key) {\n    case 'ArrowDown':\n      e.preventDefault();\n      if (!listbox.hasAttribute('hidden') && optionCount > 0) {\n        activeIndex = (activeIndex + 1) % optionCount;\n        updateActiveOption();\n      }\n      break;\n\n    case 'ArrowUp':\n      e.preventDefault();\n      if (!listbox.hasAttribute('hidden') && optionCount > 0) {\n        activeIndex = (activeIndex - 1 + optionCount) % optionCount;\n        updateActiveOption();\n      }\n      break;\n\n    case 'Enter':\n      e.preventDefault();\n      if (activeIndex >= 0) {\n        selectPlayer(activeIndex);\n      }\n      break;\n\n    case 'Escape':\n      closeListbox();\n      break;\n\n    case 'Tab':\n      closeListbox();\n      break;\n  }\n});\n\nfunction updateActiveOption() {\n  clearOptionSelection();\n  const options = listbox.querySelectorAll('[role=\"option\"]');\n  if (options[activeIndex]) {\n    options[activeIndex].setAttribute('aria-selected', 'true');\n    input.setAttribute('aria-activedescendant', options[activeIndex].id);\n    // Scroll into view if needed\n    options[activeIndex].scrollIntoView({ block: 'nearest' });\n  }\n}\n\nfunction clearOptionSelection() {\n  listbox.querySelectorAll('[role=\"option\"]').forEach(opt => {\n    opt.setAttribute('aria-selected', 'false');\n  });\n}\n\n// --- Select and add to roster ---\nfunction selectPlayer(index) {\n  const player = filteredPlayers[index];\n  addToRoster(player); // your existing logic\n  input.value = '';\n  closeListbox();\n  announceToScreenReader(`${player.name} added to your roster.`);\n  input.focus();\n}\n\n// --- Live region for announcements ---\nfunction announceToScreenReader(message) {\n  const announcer = document.getElementById('sr-announcer');\n  announcer.textContent = '';\n  // Small timeout ensures the DOM change is picked up\n  setTimeout(() => { announcer.textContent = message; }, 50);\n}\n```\n\n### 3. The Live Region (add once to your page)\n\n```html\n<div\n  id=\"sr-announcer\"\n  role=\"status\"\n  aria-live=\"polite\"\n  aria-atomic=\"true\"\n  class=\"sr-only\"\n></div>\n```\n\n```css\n.sr-only {\n  position: absolute;\n  width: 1px;\n  height: 1px;\n  padding: 0;\n  margin: -1px;\n  overflow: hidden;\n  clip: rect(0, 0, 0, 0);\n  white-space: nowrap;\n  border: 0;\n}\n```\n\nThe live region lets you announce dynamic things \u2014 \"3 players found,\" \"Patrick Mahomes added to your roster\" \u2014 without moving focus away from the input.\n\n---\n\n## Result Count Announcement (Optional but Highly Recommended)\n\nAfter filtering, announce how many results appeared so the user knows whether to arrow down:\n\n```javascript\nfunction renderOptions(players) {\n  // ... existing render code ...\n\n  if (players.length > 0) {\n    announceToScreenReader(`${players.length} player${players.length === 1 ? '' : 's'} found. Use arrow keys to browse.`);\n  }\n}\n```\n\n---\n\n## CSS \u2014 Keep the List Visually Correct\n\nMake sure the listbox is positioned correctly and options have visible focus styles:\n\n```css\n.combobox-wrapper {\n  position: relative;\n  display: inline-block;\n}\n\n#player-listbox {\n  position: absolute;\n  top: 100%;\n  left: 0;\n  right: 0;\n  max-height: 300px;\n  overflow-y: auto;\n  list-style: none;\n  margin: 0;\n  padding: 0;\n  border: 1px solid #ccc;\n  background: white;\n  z-index: 100;\n}\n\n#player-listbox [role=\"option\"] {\n  padding: 8px 12px;\n  cursor: pointer;\n}\n\n#player-listbox [aria-selected=\"true\"] {\n  background-color: #0057b8;\n  color: white;\n  outline: 2px solid #003d85; /* visible focus indicator */\n}\n\n#player-listbox [role=\"option\"]:hover {\n  background-color: #e8f0fe;\n}\n```\n\n---\n\n## Checklist: What Each Fix Solves\n\n| Problem | Fix |\n|---|---|\n| Screen reader doesn't know input and list are related | `aria-controls` on the input pointing to the listbox ID |\n| No announcement when list opens/closes | `aria-expanded` toggled on the input |\n| Reader can't tell what item is highlighted | `aria-activedescendant` updated on keydown |\n| List items have no semantic meaning | `role=\"listbox\"` on ul, `role=\"option\"` on each li |\n| No way to know which item is selected | `aria-selected=\"true\"` on active option |\n| No feedback when player is added | `aria-live` region announces confirmation |\n| Input has no label | `<label for=\"player-search\">` |\n| Result count unknown | Live region announces count after filtering |\n\n---\n\n## Testing\n\n1. **NVDA + Chrome** or **JAWS + Chrome** on Windows\n2. **VoiceOver + Safari** on Mac (Cmd+F5 to enable)\n3. **Axe DevTools** browser extension for automated checks\n4. Keyboard-only test: Tab to input, type a name, Arrow Down through options, Enter to select, Escape to dismiss \u2014 all without touching the mouse.\n\nThe screen reader experience you should aim for: the user types in the field, hears \"3 players found, use arrow keys to browse,\" presses Arrow Down and hears \"Patrick Mahomes \u2014 QB, Chiefs, 1 of 3,\" presses Enter and hears \"Patrick Mahomes added to your roster.\"\n"}], "grading": {"eval_id": 1, "eval_name": "custom-dropdown", "configuration": "without_skill", "expectations": [{"text": "Adds role='combobox' to the input or wrapping element", "passed": true, "evidence": "role='combobox' on the <input>"}, {"text": "Includes aria-expanded to reflect open/closed state", "passed": true, "evidence": "aria-expanded included"}, {"text": "Includes aria-controls pointing to the listbox", "passed": true, "evidence": "aria-controls pointing to listbox id"}, {"text": "Adds role='listbox' to the results list", "passed": true, "evidence": "role='listbox' on the <ul>"}, {"text": "Adds role='option' to each result item", "passed": true, "evidence": "role='option' on each <li>"}, {"text": "Mentions aria-activedescendant for tracking highlighted option", "passed": true, "evidence": "aria-activedescendant mentioned and implemented"}, {"text": "Covers keyboard pattern: arrows to navigate, Enter to select, Escape to close", "passed": true, "evidence": "Keyboard behavior covered including mousedown vs click nuance"}, {"text": "Mentions the input needs a <label>", "passed": true, "evidence": "Noted as likely missing and included in fix"}]}}, {"id": "eval-player-card-contrast-with_skill", "prompt": "My player cards show a player's name, position, team, and their projected points. The projected points are highlighted in green when they're above 15 points. My designer flagged this might have contrast issues. Also I'm showing injury status with just a colored dot (green/yellow/red). Walk me through what I need to check and fix for accessibility.", "eval_id": 2, "outputs": [{"name": "response.md", "type": "text", "content": "# Accessibility Fixes for Player Cards\n\nTwo distinct issues here, each governed by a different WCAG criterion. I'll walk through both.\n\n---\n\n## Issue 1: Green projected points highlight \u2014 Color Contrast\n\n**Criterion: WCAG 1.4.3 (Contrast Minimum, AA)**\n\nYour designer is right to flag this. Green-on-white (or green-on-card-background) is one of the most common contrast failures. The specific requirement depends on your text size:\n\n| Text size | Required ratio |\n|---|---|\n| Normal text (< 18pt / < 14pt bold) | 4.5:1 |\n| Large text (\u2265 18pt or \u2265 14pt bold) | 3:1 |\n\nProjected points are likely displayed at a normal body size, so you're targeting **4.5:1**.\n\n### How to check\n\nRun your exact green foreground color against your card background color through a contrast checker. Use browser DevTools color picker, or paste the hex values into [Coolors Contrast Checker](https://coolors.co/contrast-checker).\n\nCommon greens that fail:\n- `#4CAF50` on white = ~4.5:1 (borderline \u2014 passes, barely)\n- `#66BB6A` on white = ~3.3:1 (fails)\n- `#81C784` on white = ~2.5:1 (fails)\n- `#2E7D32` on white = ~9:1 (passes easily)\n\n### What to fix\n\nIf your green fails, use a darker green for the text/number itself \u2014 you don't need to change the background color. A dark green like `#276221` or `#1B5E20` on a white or light card background will pass.\n\n```css\n/* Example: failing */\n.projected-points.high {\n  color: #66BB6A; /* ~3.3:1 on white \u2014 FAIL */\n}\n\n/* Fixed: darker green that passes 4.5:1 */\n.projected-points.high {\n  color: #1B6E1B; /* passes 4.5:1 on white */\n}\n```\n\nIf you're using the green as a background highlight with white text on top, that combination almost always fails \u2014 light green backgrounds need dark (near-black) text, not white.\n\n---\n\n## Issue 2: Colored dot for injury status \u2014 Color as the Only Cue\n\n**Criterion: WCAG 1.4.1 (Use of Color, AA)**\n\nA green/yellow/red dot conveys meaning through color alone. Users who are colorblind (roughly 8% of males have red-green color blindness) cannot distinguish these states. A screen reader user gets nothing at all \u2014 a dot has no accessible name and no semantic meaning.\n\nThis needs two fixes: one for low-vision/colorblind users, one for screen reader users.\n\n### Fix 1: Add a non-color cue for sighted users\n\nDon't rely on color alone. Add a text label or at minimum a distinct shape/icon per status.\n\n**Option A \u2014 Text label (recommended):**\n```html\n<span class=\"injury-status injury-status--questionable\">\n  Q\n</span>\n```\nOr spell it out if space allows: \"Out\", \"Q\", \"GTD\" \u2014 these are already standard fantasy conventions that don't depend on color perception.\n\n**Option B \u2014 Shape/icon + color:**\nUse distinct icons per status (checkmark for healthy, warning triangle for questionable, X for out) so the shape carries the meaning, not just the color.\n\n### Fix 2: Make the status readable by screen readers\n\nThe dot is almost certainly a `<span>` or `<div>` with no text content. A screen reader skips it or reads nothing useful.\n\nThe correct fix is visually hidden text:\n\n```css\n.sr-only {\n  position: absolute;\n  width: 1px;\n  height: 1px;\n  padding: 0;\n  margin: -1px;\n  overflow: hidden;\n  clip: rect(0, 0, 0, 0);\n  white-space: nowrap;\n  border: 0;\n}\n```\n\n```html\n<!-- Before: screen reader reads nothing -->\n<span class=\"dot dot--red\" aria-hidden=\"false\"></span>\n\n<!-- After: screen reader reads \"Injury status: Out\" -->\n<span class=\"dot dot--red\" aria-hidden=\"true\"></span>\n<span class=\"sr-only\">Injury status: Out</span>\n```\n\nNote: `aria-hidden=\"true\"` on the dot suppresses the decorative element. The `sr-only` span carries the text. Together, sighted users see the dot, screen reader users hear the label.\n\nAlternatively, if the dot is a standalone element with no adjacent text, use `aria-label` directly:\n\n```html\n<span\n  class=\"dot dot--red\"\n  role=\"img\"\n  aria-label=\"Injury status: Out\"\n></span>\n```\n\nUse `role=\"img\"` here because a `<span>` has no implicit role \u2014 without it, screen readers may not read the `aria-label`. The `role=\"img\"` + `aria-label` combination makes it a labeled image.\n\n---\n\n## Summary of what to do\n\n1. **Contrast check your green** \u2014 plug your exact hex values into a contrast checker. If the ratio is below 4.5:1, darken the green until it passes. Don't change the background; change the foreground text/number color.\n\n2. **Add text to injury dots** \u2014 pick between visually-hidden `sr-only` text (if the dot stays decorative) or visible text labels. Either way, screen readers need something to announce. Colorblind users need a non-color cue too \u2014 visible abbreviations (\"Out\", \"Q\", \"GTD\") solve both at once.\n\n3. **Don't touch the card background color** \u2014 the card background is not the problem. The contrast issue is specifically between the highlighted number and its background, and the injury dot conveys meaning through color alone.\n"}], "grading": {"eval_id": 2, "eval_name": "player-card-contrast", "configuration": "with_skill", "expectations": [{"text": "Identifies the correct contrast ratio threshold (4.5:1 for normal text, 3:1 for large text)", "passed": true, "evidence": "Table showing 4.5:1 for normal text, 3:1 for large text, with note about projected points likely being normal size"}, {"text": "Suggests a tool or method to check the actual contrast ratio", "passed": true, "evidence": "Suggests browser DevTools color picker and Coolors Contrast Checker with specific URL"}, {"text": "Identifies the color-only dot as a WCAG 1.4.1 violation", "passed": true, "evidence": "Explicitly names WCAG 1.4.1 Use of Color and explains both colorblind and screen reader user impact"}, {"text": "Provides a concrete fix for the color-only dot (adding text, icon, or label)", "passed": true, "evidence": "Two options: text label ('Q', 'Out', 'GTD') and shape/icon; plus sr-only fix for screen readers"}, {"text": "References specific WCAG criteria (e.g., 1.4.3 for contrast, 1.4.1 for color-only)", "passed": true, "evidence": "Both WCAG 1.4.3 and 1.4.1 named explicitly with AA level"}]}}, {"id": "eval-player-card-contrast-without_skill", "prompt": "My player cards show a player's name, position, team, and their projected points. The projected points are highlighted in green when they're above 15 points. My designer flagged this might have contrast issues. Also I'm showing injury status with just a colored dot (green/yellow/red). Walk me through what I need to check and fix for accessibility.", "eval_id": 2, "outputs": [{"name": "response.md", "type": "text", "content": "# Accessibility Issues: Player Cards\n\n## Issue 1: Green Highlighted Projected Points (Color Contrast)\n\n### What to Check\n\nThe WCAG 2.1 standard requires a minimum contrast ratio of **4.5:1** for normal text and **3:1** for large text (18pt/14pt bold or larger) against its background.\n\nGreen text or green backgrounds are among the most common contrast failures because many \"nice looking\" greens \u2014 especially bright or medium greens \u2014 fall far short of these ratios.\n\n**Specific checks to run:**\n\n1. **Identify your exact colors.** Get the hex values for both the text color and the background color of the highlighted projected points element. If you're using something like `color: green` or `background-color: #00ff00`, those are almost certainly going to fail.\n\n2. **Test the contrast ratio.** Use one of these tools:\n   - WebAIM Contrast Checker: https://webaim.org/resources/contrastchecker/\n   - browser DevTools (Chrome and Firefox both have contrast ratio displays in the color picker within the Accessibility panel)\n   - the `axe` browser extension\n\n3. **Determine which threshold applies.** If the projected points text is small (under ~18px regular or ~14px bold), you need 4.5:1. If it's large, 3:1.\n\n### Common Green Contrast Problems and Fixes\n\n| Scenario | Problem | Fix |\n|---|---|---|\n| Green text on white background | Bright/medium greens like `#00cc00` often fail at 4.5:1 | Use a dark green like `#1a7a1a` or `#155724` |\n| White text on green background | Light/medium greens don't give enough contrast for white text | Use a dark green (e.g., `#155724`) or switch to dark text on light green |\n| Green text on a colored card background | Non-white backgrounds change the math entirely | Re-test with the actual card background color |\n\n**Recommended approach:** Dark text on a light green background typically passes more easily. For example, dark gray `#212529` on light green `#d4edda` achieves well over 7:1 contrast.\n\nIf you want to keep a \"green highlight\" feel:\n- Light green background (`#d4edda` or similar) + dark text (`#155724` or `#212529`) \u2014 this is the Bootstrap \"success alert\" pattern and it passes WCAG AA.\n- Avoid: bright green text (`#00cc00`, `#28a745`) on white unless you've confirmed the ratio passes.\n\n---\n\n## Issue 2: Injury Status Color Dots (Color as the Only Indicator)\n\nThis is a separate and equally important accessibility issue. Using only color to convey meaning violates **WCAG 1.4.1: Use of Color** (Level A \u2014 the baseline, not even AA).\n\n### Why It Fails\n\nUsers who are colorblind (roughly 8% of men, 0.5% of women) may not be able to distinguish red from green, or may see yellow and green as identical. A colored dot with no text, icon shape, pattern, or tooltip conveys zero information to these users.\n\n### What to Check\n\nAsk yourself: if someone converts your UI to grayscale, can they still tell the difference between a healthy player, a questionable player, and an injured player? If not, you have a failure.\n\n### How to Fix It\n\nYou need at least one non-color channel to communicate the status. Here are your options, roughly in order of user experience quality:\n\n**Option 1: Add a text label (most accessible)**\n```html\n<!-- Instead of just a colored dot, add visible text -->\n<span class=\"injury-dot injury-green\" aria-hidden=\"true\"></span>\n<span class=\"injury-label\">Healthy</span>\n\n<span class=\"injury-dot injury-yellow\" aria-hidden=\"true\"></span>\n<span class=\"injury-label\">Questionable</span>\n\n<span class=\"injury-dot injury-red\" aria-hidden=\"true\"></span>\n<span class=\"injury-label\">Out</span>\n```\n\n**Option 2: Add an `aria-label` to the dot (screen reader accessible, but still fails for colorblind sighted users)**\n```html\n<!-- This helps screen reader users but does NOT fix the colorblind issue -->\n<span class=\"injury-dot injury-green\" role=\"img\" aria-label=\"Injury status: Healthy\"></span>\n```\nUse this in addition to a visible indicator, not instead of one.\n\n**Option 3: Use different shapes or icons in addition to color**\n```html\n<!-- Checkmark for healthy, exclamation for questionable, X for out -->\n<span class=\"injury-indicator\" aria-label=\"Healthy\">\n  <svg aria-hidden=\"true\"><!-- checkmark icon --></svg>\n</span>\n```\n\n**Option 4: Add a tooltip that appears on hover/focus**\nThis helps sighted users but does not fully satisfy WCAG because it requires interaction to discover. Pair it with a visible label or icon difference.\n\n### Recommended Combined Approach\n\n```html\n<div class=\"injury-status\">\n  <span class=\"dot dot--healthy\" aria-hidden=\"true\"></span>\n  <span class=\"injury-label\">Healthy</span>\n</div>\n```\n\nAnd for screen readers, if the label is already visible, no additional aria is needed. If you hide the label visually (e.g., with a `.sr-only` class), use `aria-label` on a wrapper:\n\n```html\n<div class=\"injury-status\" role=\"img\" aria-label=\"Injury status: Questionable\">\n  <span class=\"dot dot--questionable\" aria-hidden=\"true\"></span>\n  <!-- Optional: visually hidden text for screen readers if no visible label -->\n  <span class=\"sr-only\">Questionable</span>\n</div>\n```\n\n---\n\n## Summary Checklist\n\n| Issue | WCAG Criterion | Priority | Fix |\n|---|---|---|---|\n| Green highlight contrast ratio | 1.4.3 Contrast (Minimum) \u2014 Level AA | High | Test actual hex values; switch to dark text on light green background |\n| Injury dots \u2014 color only | 1.4.1 Use of Color \u2014 Level A | Critical (Level A failure) | Add visible text labels or distinguishing icons alongside color |\n| Injury dots \u2014 no accessible name | 4.1.2 Name, Role, Value \u2014 Level A | High | Add `aria-label` or visible text so screen reader users get status |\n\n**Level A failures (like the color-only dots) should be treated as blockers** \u2014 they exclude users at the most basic level of WCAG conformance.\n\n---\n\n## Practical Next Steps\n\n1. Run your card through the axe DevTools extension \u2014 it will flag missing text alternatives and contrast failures automatically.\n2. Use Chrome DevTools > Accessibility panel to inspect the contrast ratio of your green highlighted points in context.\n3. Test with the \"Emulate vision deficiency\" option in Chrome DevTools (Rendering tab) \u2014 set it to Deuteranopia (green-blind) to see exactly what colorblind users see.\n4. Add visible text labels to all three injury states as the minimum fix, then layer in `aria-label` for screen reader support.\n"}], "grading": {"eval_id": 2, "eval_name": "player-card-contrast", "configuration": "without_skill", "expectations": [{"text": "Identifies the correct contrast ratio threshold (4.5:1 for normal text, 3:1 for large text)", "passed": true, "evidence": "Both 4.5:1 and 3:1 ratios mentioned correctly"}, {"text": "Suggests a tool or method to check the actual contrast ratio", "passed": true, "evidence": "Suggests WebAIM checker and Chrome DevTools accessibility panel"}, {"text": "Identifies the color-only dot as a WCAG 1.4.1 violation", "passed": true, "evidence": "Identifies as WCAG 1.4.1 Level A failure"}, {"text": "Provides a concrete fix for the color-only dot (adding text, icon, or label)", "passed": true, "evidence": "Suggests visible text labels and icons; mentions aria-label on wrapper for screen readers"}, {"text": "References specific WCAG criteria (e.g., 1.4.3 for contrast, 1.4.1 for color-only)", "passed": true, "evidence": "WCAG 1.4.3 and 1.4.1 both named; correctly identifies 1.4.1 as Level A (not just AA)"}]}}], "previous_feedback": {}, "previous_outputs": {}, "benchmark": {"metadata": {"skill_name": "accessibility-code", "skill_path": "<path/to/skill>", "executor_model": "<model-name>", "analyzer_model": "<model-name>", "timestamp": "2026-06-20T21:47:53Z", "evals_run": [0, 1, 2], "runs_per_configuration": 3}, "runs": [{"eval_id": 1, "configuration": "with_skill", "run_number": 1, "result": {"pass_rate": 1.0, "passed": 8, "failed": 0, "total": 8, "time_seconds": 0.0, "tokens": 0, "tool_calls": 0, "errors": 0}, "expectations": [{"text": "Adds role='combobox' to the input or wrapping element", "passed": true, "evidence": "role='combobox' on <input> with full explanation"}, {"text": "Includes aria-expanded to reflect open/closed state", "passed": true, "evidence": "aria-expanded included with instruction to update in JS"}, {"text": "Includes aria-controls pointing to the listbox", "passed": true, "evidence": "aria-controls='player-listbox' links input to the <ul>"}, {"text": "Adds role='listbox' to the results list", "passed": true, "evidence": "role='listbox' on <ul> with id='player-listbox'"}, {"text": "Adds role='option' to each result item", "passed": true, "evidence": "role='option' on each <li> with unique ids"}, {"text": "Mentions aria-activedescendant for tracking highlighted option", "passed": true, "evidence": "aria-activedescendant explained in detail; key insight that real focus never leaves the input"}, {"text": "Covers keyboard pattern: arrows to navigate, Enter to select, Escape to close", "passed": true, "evidence": "Full keyboard table covering Down/Up, Enter, Escape, Tab"}, {"text": "Mentions the input needs a <label>", "passed": true, "evidence": "First line of fix: <label for='player-search'>"}], "notes": []}, {"eval_id": 0, "configuration": "with_skill", "run_number": 1, "result": {"pass_rate": 1.0, "passed": 7, "failed": 0, "total": 7, "time_seconds": 0.0, "tokens": 0, "tool_calls": 0, "errors": 0}, "expectations": [{"text": "Recommends <dialog> element OR role='dialog' with aria-modal='true'", "passed": true, "evidence": "Explicitly recommends native <dialog> with .showModal()"}, {"text": "Mentions aria-labelledby pointing to the dialog title", "passed": true, "evidence": "aria-labelledby='trade-dialog-title' on the dialog element"}, {"text": "Covers focus trap \u2014 focus cycles within the modal", "passed": true, "evidence": "showModal() handles trapping automatically; advises not to add manual trap"}, {"text": "Mentions moving focus INTO the dialog on open", "passed": true, "evidence": "autoFocus on Send Offer button with rationale"}, {"text": "Mentions returning focus to trigger element on close", "passed": true, "evidence": "triggerRef.current?.focus() in useEffect on close"}, {"text": "Covers Escape key closing the dialog", "passed": true, "evidence": "Intercepts 'cancel' event with preventDefault and calls onCancel()"}, {"text": "Provides working code (not just description)", "passed": true, "evidence": "Full TypeScript React component with props interface and usage example"}], "notes": []}, {"eval_id": 2, "configuration": "with_skill", "run_number": 1, "result": {"pass_rate": 1.0, "passed": 5, "failed": 0, "total": 5, "time_seconds": 0.0, "tokens": 0, "tool_calls": 0, "errors": 0}, "expectations": [{"text": "Identifies the correct contrast ratio threshold (4.5:1 for normal text, 3:1 for large text)", "passed": true, "evidence": "Table showing 4.5:1 for normal text, 3:1 for large text"}, {"text": "Suggests a tool or method to check the actual contrast ratio", "passed": true, "evidence": "Suggests browser DevTools and Coolors Contrast Checker with URL"}, {"text": "Identifies the color-only dot as a WCAG 1.4.1 violation", "passed": true, "evidence": "Explicitly names WCAG 1.4.1 Use of Color with colorblind and screen reader impact"}, {"text": "Provides a concrete fix for the color-only dot (adding text, icon, or label)", "passed": true, "evidence": "Two options: text label (Q/Out/GTD) and shape/icon; plus sr-only fix for screen readers"}, {"text": "References specific WCAG criteria (e.g., 1.4.3 for contrast, 1.4.1 for color-only)", "passed": true, "evidence": "Both WCAG 1.4.3 and 1.4.1 named explicitly with AA level"}], "notes": []}, {"eval_id": 1, "configuration": "without_skill", "run_number": 1, "result": {"pass_rate": 1.0, "passed": 8, "failed": 0, "total": 8, "time_seconds": 0.0, "tokens": 0, "tool_calls": 0, "errors": 0}, "expectations": [{"text": "Adds role='combobox' to the input or wrapping element", "passed": true, "evidence": "role='combobox' on the <input>"}, {"text": "Includes aria-expanded to reflect open/closed state", "passed": true, "evidence": "aria-expanded included"}, {"text": "Includes aria-controls pointing to the listbox", "passed": true, "evidence": "aria-controls pointing to listbox id"}, {"text": "Adds role='listbox' to the results list", "passed": true, "evidence": "role='listbox' on the <ul>"}, {"text": "Adds role='option' to each result item", "passed": true, "evidence": "role='option' on each <li>"}, {"text": "Mentions aria-activedescendant for tracking highlighted option", "passed": true, "evidence": "aria-activedescendant mentioned and implemented; includes mousedown vs click nuance"}, {"text": "Covers keyboard pattern: arrows to navigate, Enter to select, Escape to close", "passed": true, "evidence": "Keyboard behavior covered"}, {"text": "Mentions the input needs a <label>", "passed": true, "evidence": "Noted as likely missing and included in fix"}], "notes": []}, {"eval_id": 0, "configuration": "without_skill", "run_number": 1, "result": {"pass_rate": 1.0, "passed": 7, "failed": 0, "total": 7, "time_seconds": 0.0, "tokens": 0, "tool_calls": 0, "errors": 0}, "expectations": [{"text": "Recommends <dialog> element OR role='dialog' with aria-modal='true'", "passed": true, "evidence": "Uses <div role='dialog' aria-modal='true'> \u2014 valid but misses native <dialog> element recommendation"}, {"text": "Mentions aria-labelledby pointing to the dialog title", "passed": true, "evidence": "aria-labelledby='trade-dialog-title' on container div"}, {"text": "Covers focus trap \u2014 focus cycles within the modal", "passed": true, "evidence": "Manual focus trap with querySelectorAll of focusable selectors"}, {"text": "Mentions moving focus INTO the dialog on open", "passed": true, "evidence": "useEffect with setTimeout moves focus to cancelButtonRef on open"}, {"text": "Mentions returning focus to trigger element on close", "passed": true, "evidence": "Mentioned in a separate code note but not wired in main component \u2014 partial"}, {"text": "Covers Escape key closing the dialog", "passed": true, "evidence": "handleKeyDown checks for Escape and calls onCancel()"}, {"text": "Provides working code (not just description)", "passed": true, "evidence": "Full JSX component with createPortal, focus trap, keyboard handler"}], "notes": []}, {"eval_id": 2, "configuration": "without_skill", "run_number": 1, "result": {"pass_rate": 1.0, "passed": 5, "failed": 0, "total": 5, "time_seconds": 0.0, "tokens": 0, "tool_calls": 0, "errors": 0}, "expectations": [{"text": "Identifies the correct contrast ratio threshold (4.5:1 for normal text, 3:1 for large text)", "passed": true, "evidence": "Both 4.5:1 and 3:1 ratios mentioned correctly"}, {"text": "Suggests a tool or method to check the actual contrast ratio", "passed": true, "evidence": "Suggests WebAIM checker and Chrome DevTools accessibility panel"}, {"text": "Identifies the color-only dot as a WCAG 1.4.1 violation", "passed": true, "evidence": "Identifies as WCAG 1.4.1 Level A failure"}, {"text": "Provides a concrete fix for the color-only dot (adding text, icon, or label)", "passed": true, "evidence": "Suggests visible text labels and icons; mentions aria-label on wrapper"}, {"text": "References specific WCAG criteria (e.g., 1.4.3 for contrast, 1.4.1 for color-only)", "passed": true, "evidence": "WCAG 1.4.3 and 1.4.1 both named; correctly identifies 1.4.1 as Level A"}], "notes": []}], "run_summary": {"with_skill": {"pass_rate": {"mean": 1.0, "stddev": 0.0, "min": 1.0, "max": 1.0}, "time_seconds": {"mean": 0.0, "stddev": 0.0, "min": 0.0, "max": 0.0}, "tokens": {"mean": 0.0, "stddev": 0.0, "min": 0, "max": 0}}, "without_skill": {"pass_rate": {"mean": 1.0, "stddev": 0.0, "min": 1.0, "max": 1.0}, "time_seconds": {"mean": 0.0, "stddev": 0.0, "min": 0.0, "max": 0.0}, "tokens": {"mean": 0.0, "stddev": 0.0, "min": 0, "max": 0}}, "delta": {"pass_rate": "+0.00", "time_seconds": "+0.0", "tokens": "+0"}}, "notes": []}};
+
+    // ---- State ----
+    let feedbackMap = {};  // run_id -> feedback text
+    let currentIndex = 0;
+    let visitedRuns = new Set();
+
+    // ---- Init ----
+    async function init() {
+      // Load saved feedback from server — but only if this isn't a fresh
+      // iteration (indicated by previous_feedback being present). When
+      // previous feedback exists, the feedback.json on disk is stale from
+      // the prior iteration and should not pre-fill the textareas.
+      const hasPrevious = Object.keys(EMBEDDED_DATA.previous_feedback || {}).length > 0
+        || Object.keys(EMBEDDED_DATA.previous_outputs || {}).length > 0;
+      if (!hasPrevious) {
+        try {
+          const resp = await fetch("/api/feedback");
+          const data = await resp.json();
+          if (data.reviews) {
+            for (const r of data.reviews) feedbackMap[r.run_id] = r.feedback;
+          }
+        } catch { /* first run, no feedback yet */ }
+      }
+
+      document.getElementById("skill-name").textContent = EMBEDDED_DATA.skill_name;
+      showRun(0);
+
+      // Wire up feedback auto-save
+      const textarea = document.getElementById("feedback");
+      let saveTimeout = null;
+      textarea.addEventListener("input", () => {
+        clearTimeout(saveTimeout);
+        document.getElementById("feedback-status").textContent = "";
+        saveTimeout = setTimeout(() => saveCurrentFeedback(), 800);
+      });
+    }
+
+    // ---- Navigation ----
+    function navigate(delta) {
+      const newIndex = currentIndex + delta;
+      if (newIndex >= 0 && newIndex < EMBEDDED_DATA.runs.length) {
+        saveCurrentFeedback();
+        showRun(newIndex);
+      }
+    }
+
+    function updateNavButtons() {
+      document.getElementById("prev-btn").disabled = currentIndex === 0;
+      document.getElementById("next-btn").disabled =
+        currentIndex === EMBEDDED_DATA.runs.length - 1;
+    }
+
+    // ---- Show a run ----
+    function showRun(index) {
+      currentIndex = index;
+      const run = EMBEDDED_DATA.runs[index];
+
+      // Progress
+      document.getElementById("progress").textContent =
+        `${index + 1} of ${EMBEDDED_DATA.runs.length}`;
+
+      // Prompt
+      document.getElementById("prompt-text").textContent = run.prompt;
+
+      // Config badge
+      const badge = document.getElementById("config-badge");
+      const configMatch = run.id.match(/(with_skill|without_skill|new_skill|old_skill)/);
+      if (configMatch) {
+        const config = configMatch[1];
+        const isBaseline = config === "without_skill" || config === "old_skill";
+        badge.textContent = config.replace(/_/g, " ");
+        badge.className = "config-badge " + (isBaseline ? "config-baseline" : "config-primary");
+        badge.style.display = "inline-block";
+      } else {
+        badge.style.display = "none";
+      }
+
+      // Outputs
+      renderOutputs(run);
+
+      // Previous outputs
+      renderPrevOutputs(run);
+
+      // Grades
+      renderGrades(run);
+
+      // Previous feedback
+      const prevFb = (EMBEDDED_DATA.previous_feedback || {})[run.id];
+      const prevEl = document.getElementById("prev-feedback");
+      if (prevFb) {
+        document.getElementById("prev-feedback-text").textContent = prevFb;
+        prevEl.style.display = "block";
+      } else {
+        prevEl.style.display = "none";
+      }
+
+      // Feedback
+      document.getElementById("feedback").value = feedbackMap[run.id] || "";
+      document.getElementById("feedback-status").textContent = "";
+
+      updateNavButtons();
+
+      // Track visited runs and promote done button when all visited
+      visitedRuns.add(index);
+      const doneBtn = document.getElementById("done-btn");
+      if (visitedRuns.size >= EMBEDDED_DATA.runs.length) {
+        doneBtn.classList.add("ready");
+      }
+
+      // Scroll main content to top
+      document.querySelector(".main").scrollTop = 0;
+    }
+
+    // ---- Render outputs ----
+    function renderOutputs(run) {
+      const container = document.getElementById("outputs-body");
+      container.innerHTML = "";
+
+      const outputs = run.outputs || [];
+      if (outputs.length === 0) {
+        container.innerHTML = '<div class="empty-state">No output files</div>';
+        return;
+      }
+
+      for (const file of outputs) {
+        const fileDiv = document.createElement("div");
+        fileDiv.className = "output-file";
+
+        // Always show file header with download link
+        const header = document.createElement("div");
+        header.className = "output-file-header";
+        const nameSpan = document.createElement("span");
+        nameSpan.textContent = file.name;
+        header.appendChild(nameSpan);
+        const dlBtn = document.createElement("a");
+        dlBtn.className = "dl-btn";
+        dlBtn.textContent = "Download";
+        dlBtn.download = file.name;
+        dlBtn.href = getDownloadUri(file);
+        header.appendChild(dlBtn);
+        fileDiv.appendChild(header);
+
+        const content = document.createElement("div");
+        content.className = "output-file-content";
+
+        if (file.type === "text") {
+          const pre = document.createElement("pre");
+          pre.textContent = file.content;
+          content.appendChild(pre);
+        } else if (file.type === "image") {
+          const img = document.createElement("img");
+          img.src = file.data_uri;
+          img.alt = file.name;
+          content.appendChild(img);
+        } else if (file.type === "pdf") {
+          const iframe = document.createElement("iframe");
+          iframe.src = file.data_uri;
+          content.appendChild(iframe);
+        } else if (file.type === "xlsx") {
+          renderXlsx(content, file.data_b64);
+        } else if (file.type === "binary") {
+          const a = document.createElement("a");
+          a.className = "download-link";
+          a.href = file.data_uri;
+          a.download = file.name;
+          a.textContent = "Download " + file.name;
+          content.appendChild(a);
+        } else if (file.type === "error") {
+          const pre = document.createElement("pre");
+          pre.textContent = file.content;
+          pre.style.color = "var(--red)";
+          content.appendChild(pre);
+        }
+
+        fileDiv.appendChild(content);
+        container.appendChild(fileDiv);
+      }
+    }
+
+    // ---- XLSX rendering via SheetJS ----
+    function renderXlsx(container, b64Data) {
+      try {
+        const raw = Uint8Array.from(atob(b64Data), c => c.charCodeAt(0));
+        const wb = XLSX.read(raw, { type: "array" });
+
+        for (let i = 0; i < wb.SheetNames.length; i++) {
+          const sheetName = wb.SheetNames[i];
+          const ws = wb.Sheets[sheetName];
+
+          if (wb.SheetNames.length > 1) {
+            const sheetLabel = document.createElement("div");
+            sheetLabel.style.cssText =
+              "font-weight:600; font-size:0.8rem; color:#b0aea5; margin-top:0.5rem; margin-bottom:0.25rem;";
+            sheetLabel.textContent = "Sheet: " + sheetName;
+            container.appendChild(sheetLabel);
+          }
+
+          const htmlStr = XLSX.utils.sheet_to_html(ws, { editable: false });
+          const wrapper = document.createElement("div");
+          wrapper.innerHTML = htmlStr;
+          container.appendChild(wrapper);
+        }
+      } catch (err) {
+        container.textContent = "Error rendering spreadsheet: " + err.message;
+      }
+    }
+
+    // ---- Grades ----
+    function renderGrades(run) {
+      const section = document.getElementById("grades-section");
+      const content = document.getElementById("grades-content");
+
+      if (!run.grading) {
+        section.style.display = "none";
+        return;
+      }
+
+      const grading = run.grading;
+      section.style.display = "block";
+      // Reset to collapsed
+      content.classList.remove("open");
+      document.getElementById("grades-arrow").classList.remove("open");
+
+      const summary = grading.summary || {};
+      const expectations = grading.expectations || [];
+
+      let html = '<div style="padding: 1rem;">';
+
+      // Summary line
+      const passRate = summary.pass_rate != null
+        ? Math.round(summary.pass_rate * 100) + "%"
+        : "?";
+      const badgeClass = summary.pass_rate >= 0.8 ? "grade-pass" : summary.pass_rate >= 0.5 ? "" : "grade-fail";
+      html += '<div class="grades-summary">';
+      html += '<span class="grade-badge ' + badgeClass + '">' + passRate + '</span>';
+      html += '<span>' + (summary.passed || 0) + ' passed, ' + (summary.failed || 0) + ' failed of ' + (summary.total || 0) + '</span>';
+      html += '</div>';
+
+      // Assertions list
+      html += '<ul class="assertion-list">';
+      for (const exp of expectations) {
+        const statusClass = exp.passed ? "pass" : "fail";
+        const statusIcon = exp.passed ? "\u2713" : "\u2717";
+        html += '<li class="assertion-item">';
+        html += '<span class="assertion-status ' + statusClass + '">' + statusIcon + '</span>';
+        html += '<span>' + escapeHtml(exp.text) + '</span>';
+        if (exp.evidence) {
+          html += '<div class="assertion-evidence">' + escapeHtml(exp.evidence) + '</div>';
+        }
+        html += '</li>';
+      }
+      html += '</ul>';
+
+      html += '</div>';
+      content.innerHTML = html;
+    }
+
+    function toggleGrades() {
+      const content = document.getElementById("grades-content");
+      const arrow = document.getElementById("grades-arrow");
+      content.classList.toggle("open");
+      arrow.classList.toggle("open");
+    }
+
+    // ---- Previous outputs (collapsible) ----
+    function renderPrevOutputs(run) {
+      const section = document.getElementById("prev-outputs-section");
+      const content = document.getElementById("prev-outputs-content");
+      const prevOutputs = (EMBEDDED_DATA.previous_outputs || {})[run.id];
+
+      if (!prevOutputs || prevOutputs.length === 0) {
+        section.style.display = "none";
+        return;
+      }
+
+      section.style.display = "block";
+      // Reset to collapsed
+      content.classList.remove("open");
+      document.getElementById("prev-outputs-arrow").classList.remove("open");
+
+      // Render the files into the content area
+      content.innerHTML = "";
+      const wrapper = document.createElement("div");
+      wrapper.style.padding = "1rem";
+
+      for (const file of prevOutputs) {
+        const fileDiv = document.createElement("div");
+        fileDiv.className = "output-file";
+
+        const header = document.createElement("div");
+        header.className = "output-file-header";
+        const nameSpan = document.createElement("span");
+        nameSpan.textContent = file.name;
+        header.appendChild(nameSpan);
+        const dlBtn = document.createElement("a");
+        dlBtn.className = "dl-btn";
+        dlBtn.textContent = "Download";
+        dlBtn.download = file.name;
+        dlBtn.href = getDownloadUri(file);
+        header.appendChild(dlBtn);
+        fileDiv.appendChild(header);
+
+        const fc = document.createElement("div");
+        fc.className = "output-file-content";
+
+        if (file.type === "text") {
+          const pre = document.createElement("pre");
+          pre.textContent = file.content;
+          fc.appendChild(pre);
+        } else if (file.type === "image") {
+          const img = document.createElement("img");
+          img.src = file.data_uri;
+          img.alt = file.name;
+          fc.appendChild(img);
+        } else if (file.type === "pdf") {
+          const iframe = document.createElement("iframe");
+          iframe.src = file.data_uri;
+          fc.appendChild(iframe);
+        } else if (file.type === "xlsx") {
+          renderXlsx(fc, file.data_b64);
+        } else if (file.type === "binary") {
+          const a = document.createElement("a");
+          a.className = "download-link";
+          a.href = file.data_uri;
+          a.download = file.name;
+          a.textContent = "Download " + file.name;
+          fc.appendChild(a);
+        }
+
+        fileDiv.appendChild(fc);
+        wrapper.appendChild(fileDiv);
+      }
+
+      content.appendChild(wrapper);
+    }
+
+    function togglePrevOutputs() {
+      const content = document.getElementById("prev-outputs-content");
+      const arrow = document.getElementById("prev-outputs-arrow");
+      content.classList.toggle("open");
+      arrow.classList.toggle("open");
+    }
+
+    // ---- Feedback (saved to server -> feedback.json) ----
+    function saveCurrentFeedback() {
+      const run = EMBEDDED_DATA.runs[currentIndex];
+      const text = document.getElementById("feedback").value;
+
+      if (text.trim() === "") {
+        delete feedbackMap[run.id];
+      } else {
+        feedbackMap[run.id] = text;
+      }
+
+      // Build reviews array from map
+      const reviews = [];
+      for (const [run_id, feedback] of Object.entries(feedbackMap)) {
+        if (feedback.trim()) {
+          reviews.push({ run_id, feedback, timestamp: new Date().toISOString() });
+        }
+      }
+
+      fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reviews, status: "in_progress" }),
+      }).then(() => {
+        document.getElementById("feedback-status").textContent = "Saved";
+      }).catch(() => {
+        // Static mode or server unavailable — no-op on auto-save,
+        // feedback will be downloaded on final submit
+        document.getElementById("feedback-status").textContent = "Will download on submit";
+      });
+    }
+
+    // ---- Done ----
+    function showDoneDialog() {
+      // Save current textarea to feedbackMap (but don't POST yet)
+      const run = EMBEDDED_DATA.runs[currentIndex];
+      const text = document.getElementById("feedback").value;
+      if (text.trim() === "") {
+        delete feedbackMap[run.id];
+      } else {
+        feedbackMap[run.id] = text;
+      }
+
+      // POST once with status: complete — include ALL runs so the model
+      // can distinguish "no feedback" (looks good) from "not reviewed"
+      const reviews = [];
+      const ts = new Date().toISOString();
+      for (const r of EMBEDDED_DATA.runs) {
+        reviews.push({ run_id: r.id, feedback: feedbackMap[r.id] || "", timestamp: ts });
+      }
+      const payload = JSON.stringify({ reviews, status: "complete" }, null, 2);
+      fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: payload,
+      }).then(() => {
+        document.getElementById("done-overlay").classList.add("visible");
+      }).catch(() => {
+        // Server not available (static mode) — download as file
+        const blob = new Blob([payload], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "feedback.json";
+        a.click();
+        URL.revokeObjectURL(url);
+        document.getElementById("done-overlay").classList.add("visible");
+      });
+    }
+
+    function closeDoneDialog() {
+      // Reset status back to in_progress
+      saveCurrentFeedback();
+      document.getElementById("done-overlay").classList.remove("visible");
+    }
+
+    // ---- Toast ----
+    function showToast(message) {
+      const toast = document.getElementById("toast");
+      toast.textContent = message;
+      toast.classList.add("visible");
+      setTimeout(() => toast.classList.remove("visible"), 2000);
+    }
+
+    // ---- Keyboard nav ----
+    document.addEventListener("keydown", (e) => {
+      // Don't capture when typing in textarea
+      if (e.target.tagName === "TEXTAREA") return;
+
+      if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+        e.preventDefault();
+        navigate(-1);
+      } else if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+        e.preventDefault();
+        navigate(1);
+      }
+    });
+
+    // ---- Util ----
+    function getDownloadUri(file) {
+      if (file.data_uri) return file.data_uri;
+      if (file.data_b64) return "data:application/octet-stream;base64," + file.data_b64;
+      if (file.type === "text") return "data:text/plain;charset=utf-8," + encodeURIComponent(file.content);
+      return "#";
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement("div");
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // ---- View switching ----
+    function switchView(view) {
+      document.querySelectorAll(".view-tab").forEach(t => t.classList.remove("active"));
+      document.querySelectorAll(".view-panel").forEach(p => p.classList.remove("active"));
+      document.querySelector(`[onclick="switchView('${view}')"]`).classList.add("active");
+      document.getElementById("panel-" + view).classList.add("active");
+    }
+
+    // ---- Benchmark rendering ----
+    function renderBenchmark() {
+      const data = EMBEDDED_DATA.benchmark;
+      if (!data) return;
+
+      // Show the tabs
+      document.getElementById("view-tabs").style.display = "flex";
+
+      const container = document.getElementById("benchmark-content");
+      const summary = data.run_summary || {};
+      const metadata = data.metadata || {};
+      const notes = data.notes || [];
+
+      let html = "";
+
+      // Header
+      html += "<h2 style='font-family: Poppins, sans-serif; margin-bottom: 0.5rem;'>Benchmark Results</h2>";
+      html += "<p style='color: var(--text-muted); font-size: 0.875rem; margin-bottom: 1.25rem;'>";
+      if (metadata.skill_name) html += "<strong>" + escapeHtml(metadata.skill_name) + "</strong> &mdash; ";
+      if (metadata.timestamp) html += metadata.timestamp + " &mdash; ";
+      if (metadata.evals_run) html += "Evals: " + metadata.evals_run.join(", ") + " &mdash; ";
+      html += (metadata.runs_per_configuration || "?") + " runs per configuration";
+      html += "</p>";
+
+      // Summary table
+      html += '<table class="benchmark-table">';
+
+      function fmtStat(stat, pct) {
+        if (!stat) return "—";
+        const suffix = pct ? "%" : "";
+        const m = pct ? (stat.mean * 100).toFixed(0) : stat.mean.toFixed(1);
+        const s = pct ? (stat.stddev * 100).toFixed(0) : stat.stddev.toFixed(1);
+        return m + suffix + " ± " + s + suffix;
+      }
+
+      function deltaClass(val) {
+        if (!val) return "";
+        const n = parseFloat(val);
+        if (n > 0) return "benchmark-delta-positive";
+        if (n < 0) return "benchmark-delta-negative";
+        return "";
+      }
+
+      // Discover config names dynamically (everything except "delta")
+      const configs = Object.keys(summary).filter(k => k !== "delta");
+      const configA = configs[0] || "config_a";
+      const configB = configs[1] || "config_b";
+      const labelA = configA.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+      const labelB = configB.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+      const a = summary[configA] || {};
+      const b = summary[configB] || {};
+      const delta = summary.delta || {};
+
+      html += "<thead><tr><th>Metric</th><th>" + escapeHtml(labelA) + "</th><th>" + escapeHtml(labelB) + "</th><th>Delta</th></tr></thead>";
+      html += "<tbody>";
+
+      html += "<tr><td><strong>Pass Rate</strong></td>";
+      html += "<td>" + fmtStat(a.pass_rate, true) + "</td>";
+      html += "<td>" + fmtStat(b.pass_rate, true) + "</td>";
+      html += '<td class="' + deltaClass(delta.pass_rate) + '">' + (delta.pass_rate || "—") + "</td></tr>";
+
+      // Time (only show row if data exists)
+      if (a.time_seconds || b.time_seconds) {
+        html += "<tr><td><strong>Time (s)</strong></td>";
+        html += "<td>" + fmtStat(a.time_seconds, false) + "</td>";
+        html += "<td>" + fmtStat(b.time_seconds, false) + "</td>";
+        html += '<td class="' + deltaClass(delta.time_seconds) + '">' + (delta.time_seconds ? delta.time_seconds + "s" : "—") + "</td></tr>";
+      }
+
+      // Tokens (only show row if data exists)
+      if (a.tokens || b.tokens) {
+        html += "<tr><td><strong>Tokens</strong></td>";
+        html += "<td>" + fmtStat(a.tokens, false) + "</td>";
+        html += "<td>" + fmtStat(b.tokens, false) + "</td>";
+        html += '<td class="' + deltaClass(delta.tokens) + '">' + (delta.tokens || "—") + "</td></tr>";
+      }
+
+      html += "</tbody></table>";
+
+      // Per-eval breakdown (if runs data available)
+      const runs = data.runs || [];
+      if (runs.length > 0) {
+        const evalIds = [...new Set(runs.map(r => r.eval_id))].sort((a, b) => a - b);
+
+        html += "<h3 style='font-family: Poppins, sans-serif; margin-bottom: 0.75rem;'>Per-Eval Breakdown</h3>";
+
+        const hasTime = runs.some(r => r.result && r.result.time_seconds != null);
+        const hasErrors = runs.some(r => r.result && r.result.errors > 0);
+
+        for (const evalId of evalIds) {
+          const evalRuns = runs.filter(r => r.eval_id === evalId);
+          const evalName = evalRuns[0] && evalRuns[0].eval_name ? evalRuns[0].eval_name : "Eval " + evalId;
+
+          html += "<h4 style='font-family: Poppins, sans-serif; margin: 1rem 0 0.5rem; color: var(--text);'>" + escapeHtml(evalName) + "</h4>";
+          html += '<table class="benchmark-table">';
+          html += "<thead><tr><th>Config</th><th>Run</th><th>Pass Rate</th>";
+          if (hasTime) html += "<th>Time (s)</th>";
+          if (hasErrors) html += "<th>Crashes During Execution</th>";
+          html += "</tr></thead>";
+          html += "<tbody>";
+
+          // Group by config and render with average rows
+          const configGroups = [...new Set(evalRuns.map(r => r.configuration))];
+          for (let ci = 0; ci < configGroups.length; ci++) {
+            const config = configGroups[ci];
+            const configRuns = evalRuns.filter(r => r.configuration === config);
+            if (configRuns.length === 0) continue;
+
+            const rowClass = ci === 0 ? "benchmark-row-with" : "benchmark-row-without";
+            const configLabel = config.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+
+            for (const run of configRuns) {
+              const r = run.result || {};
+              const prClass = r.pass_rate >= 0.8 ? "benchmark-delta-positive" : r.pass_rate < 0.5 ? "benchmark-delta-negative" : "";
+              html += '<tr class="' + rowClass + '">';
+              html += "<td>" + configLabel + "</td>";
+              html += "<td>" + run.run_number + "</td>";
+              html += '<td class="' + prClass + '">' + ((r.pass_rate || 0) * 100).toFixed(0) + "% (" + (r.passed || 0) + "/" + (r.total || 0) + ")</td>";
+              if (hasTime) html += "<td>" + (r.time_seconds != null ? r.time_seconds.toFixed(1) : "—") + "</td>";
+              if (hasErrors) html += "<td>" + (r.errors || 0) + "</td>";
+              html += "</tr>";
+            }
+
+            // Average row
+            const rates = configRuns.map(r => (r.result || {}).pass_rate || 0);
+            const avgRate = rates.reduce((a, b) => a + b, 0) / rates.length;
+            const avgPrClass = avgRate >= 0.8 ? "benchmark-delta-positive" : avgRate < 0.5 ? "benchmark-delta-negative" : "";
+            html += '<tr class="benchmark-row-avg ' + rowClass + '">';
+            html += "<td>" + configLabel + "</td>";
+            html += "<td>Avg</td>";
+            html += '<td class="' + avgPrClass + '">' + (avgRate * 100).toFixed(0) + "%</td>";
+            if (hasTime) {
+              const times = configRuns.map(r => (r.result || {}).time_seconds).filter(t => t != null);
+              html += "<td>" + (times.length ? (times.reduce((a, b) => a + b, 0) / times.length).toFixed(1) : "—") + "</td>";
+            }
+            if (hasErrors) html += "<td></td>";
+            html += "</tr>";
+          }
+          html += "</tbody></table>";
+
+          // Per-assertion detail for this eval
+          const runsWithExpectations = {};
+          for (const config of configGroups) {
+            runsWithExpectations[config] = evalRuns.filter(r => r.configuration === config && r.expectations && r.expectations.length > 0);
+          }
+          const hasAnyExpectations = Object.values(runsWithExpectations).some(runs => runs.length > 0);
+          if (hasAnyExpectations) {
+            // Collect all unique assertion texts across all configs
+            const allAssertions = [];
+            const seen = new Set();
+            for (const config of configGroups) {
+              for (const run of runsWithExpectations[config]) {
+                for (const exp of (run.expectations || [])) {
+                  if (!seen.has(exp.text)) {
+                    seen.add(exp.text);
+                    allAssertions.push(exp.text);
+                  }
+                }
+              }
+            }
+
+            html += '<table class="benchmark-table" style="margin-top: 0.5rem;">';
+            html += "<thead><tr><th>Assertion</th>";
+            for (const config of configGroups) {
+              const label = config.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+              html += "<th>" + escapeHtml(label) + "</th>";
+            }
+            html += "</tr></thead><tbody>";
+
+            for (const assertionText of allAssertions) {
+              html += "<tr><td>" + escapeHtml(assertionText) + "</td>";
+
+              for (const config of configGroups) {
+                html += "<td>";
+                for (const run of runsWithExpectations[config]) {
+                  const exp = (run.expectations || []).find(e => e.text === assertionText);
+                  if (exp) {
+                    const cls = exp.passed ? "benchmark-delta-positive" : "benchmark-delta-negative";
+                    const icon = exp.passed ? "\u2713" : "\u2717";
+                    html += '<span class="' + cls + '" title="Run ' + run.run_number + ': ' + escapeHtml(exp.evidence || "") + '">' + icon + "</span> ";
+                  } else {
+                    html += "— ";
+                  }
+                }
+                html += "</td>";
+              }
+              html += "</tr>";
+            }
+            html += "</tbody></table>";
+          }
+        }
+      }
+
+      // Notes
+      if (notes.length > 0) {
+        html += '<div class="benchmark-notes">';
+        html += "<h3>Analysis Notes</h3>";
+        html += "<ul>";
+        for (const note of notes) {
+          html += "<li>" + escapeHtml(note) + "</li>";
+        }
+        html += "</ul></div>";
+      }
+
+      container.innerHTML = html;
+    }
+
+    // ---- Start ----
+    init();
+    renderBenchmark();
+  </script>
+</body>
+</html>

@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>accessibility-code Skill Benchmark</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: #f5f5f7;
+    color: #1d1d1f;
+    padding: 32px 24px;
+    min-height: 100vh;
+  }
+
+  h1 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+  .subtitle { color: #6e6e73; font-size: 14px; margin-bottom: 32px; }
+
+  /* ── Overall scorecard ── */
+  .scorecard {
+    display: grid;
+    grid-template-columns: 1fr 80px 1fr;
+    gap: 16px;
+    margin-bottom: 32px;
+    align-items: center;
+  }
+
+  .score-box {
+    border-radius: 16px;
+    padding: 28px 24px;
+    text-align: center;
+  }
+
+  .score-box.skill {
+    background: #1a1a2e;
+    color: #fff;
+  }
+
+  .score-box.no-skill {
+    background: #fff;
+    color: #1d1d1f;
+    border: 2px solid #e5e5ea;
+  }
+
+  .score-label {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    opacity: 0.7;
+    margin-bottom: 8px;
+  }
+
+  .score-number {
+    font-size: 56px;
+    font-weight: 800;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  .score-box.skill .score-number { color: #4ade80; }
+  .score-box.no-skill .score-number { color: #ef4444; }
+
+  .score-sub {
+    font-size: 13px;
+    opacity: 0.6;
+  }
+
+  .delta-box {
+    text-align: center;
+  }
+
+  .delta-badge {
+    display: inline-block;
+    background: #4ade80;
+    color: #14532d;
+    font-size: 18px;
+    font-weight: 800;
+    padding: 8px 14px;
+    border-radius: 50px;
+    margin-bottom: 6px;
+  }
+
+  .delta-label {
+    font-size: 11px;
+    color: #6e6e73;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  /* ── Cards ── */
+  .card {
+    background: #fff;
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+
+  .card-title {
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .card-title .icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    background: #f5f5f7;
+  }
+
+  /* ── Bar chart container ── */
+  .chart-wrap {
+    position: relative;
+    height: 240px;
+  }
+
+  /* ── Per-eval table ── */
+  .eval-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .eval-row {
+    border: 1px solid #e5e5ea;
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .eval-header {
+    display: grid;
+    grid-template-columns: 1fr 120px 120px;
+    align-items: center;
+    background: #f5f5f7;
+    padding: 12px 16px;
+    gap: 12px;
+  }
+
+  .eval-name {
+    font-size: 13px;
+    font-weight: 700;
+    color: #1d1d1f;
+  }
+
+  .eval-score {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    border-radius: 50px;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .pill.skill { background: #dcfce7; color: #15803d; }
+  .pill.no-skill { background: #fee2e2; color: #b91c1c; }
+  .pill.neutral { background: #fef9c3; color: #92400e; }
+
+  /* ── Assertions list ── */
+  .assertions {
+    padding: 12px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .assertion {
+    display: grid;
+    grid-template-columns: 16px 1fr 90px 90px;
+    gap: 8px;
+    align-items: start;
+    font-size: 12px;
+    padding: 6px 0;
+    border-bottom: 1px solid #f0f0f0;
+  }
+
+  .assertion:last-child { border-bottom: none; }
+
+  .assertion-text { color: #3a3a3c; line-height: 1.4; }
+
+  .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-top: 3px;
+    flex-shrink: 0;
+  }
+
+  .dot.pass { background: #22c55e; }
+  .dot.fail { background: #ef4444; }
+
+  .check { font-size: 13px; text-align: center; }
+  .check.pass { color: #22c55e; }
+  .check.fail { color: #ef4444; }
+  .check.na { color: #d1d5db; }
+
+  .col-head {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #6e6e73;
+    text-align: center;
+  }
+
+  /* ── Legend ── */
+  .legend {
+    display: flex;
+    gap: 20px;
+    align-items: center;
+    margin-bottom: 12px;
+    font-size: 12px;
+    color: #6e6e73;
+  }
+
+  .legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    display: inline-block;
+    margin-right: 4px;
+  }
+
+  .legend-dot.skill { background: #1a1a2e; }
+  .legend-dot.no-skill { background: #d1d5db; }
+
+  /* ── Key finding ── */
+  .finding {
+    background: #fffbeb;
+    border-left: 3px solid #f59e0b;
+    border-radius: 0 8px 8px 0;
+    padding: 12px 14px;
+    font-size: 13px;
+    line-height: 1.5;
+    margin-top: 16px;
+    color: #92400e;
+  }
+
+  .finding strong { color: #78350f; }
+</style>
+</head>
+<body>
+
+<h1>accessibility-code · Skill Benchmark</h1>
+<p class="subtitle">Iteration 2 · 3 evals · June 2026</p>
+
+<!-- ── Scorecard ── -->
+<div class="scorecard">
+  <div class="score-box skill">
+    <div class="score-label">With Skill</div>
+    <div class="score-number">94%</div>
+    <div class="score-sub">17 / 19 assertions passed</div>
+  </div>
+
+  <div class="delta-box">
+    <div class="delta-badge">+33%</div>
+    <div class="delta-label">improvement</div>
+  </div>
+
+  <div class="score-box no-skill">
+    <div class="score-label">Without Skill</div>
+    <div class="score-number">62%</div>
+    <div class="score-sub">12 / 19 assertions passed</div>
+  </div>
+</div>
+
+<!-- ── Bar chart ── -->
+<div class="card">
+  <div class="card-title"><span class="icon">📊</span> Pass Rate by Eval</div>
+  <div class="legend">
+    <span><span class="legend-dot skill"></span>With Skill</span>
+    <span><span class="legend-dot no-skill"></span>Without Skill</span>
+  </div>
+  <div class="chart-wrap">
+    <canvas id="barChart"></canvas>
+  </div>
+</div>
+
+<!-- ── Per-eval breakdown ── -->
+<div class="card">
+  <div class="card-title"><span class="icon">🔍</span> Assertion Breakdown</div>
+  <div class="eval-grid" id="evalGrid"></div>
+</div>
+
+<script>
+const EVALS = [
+  {
+    name: "Drag & Drop",
+    withSkill: { pass_rate: 1.0, passed: 7, total: 7 },
+    withoutSkill: { pass_rate: 0.857, passed: 6, total: 7 },
+    assertions: [
+      { text: "Covers keyboard alternative (pick up / move / drop / cancel)", withSkill: true, withoutSkill: true },
+      { text: "Space/Enter to pick up & drop, arrow keys to move", withSkill: true, withoutSkill: true },
+      { text: "Escape to cancel a drag operation", withSkill: true, withoutSkill: true },
+      { text: "Flags aria-grabbed as deprecated — don't rely on it", withSkill: true, withoutSkill: false },
+      { text: "Live region announcements for drag state changes", withSkill: true, withoutSkill: true },
+      { text: "Visible indication of grabbed / active drag state", withSkill: true, withoutSkill: true },
+      { text: "Instructions for keyboard interface provided to users", withSkill: true, withoutSkill: true },
+    ]
+  },
+  {
+    name: "Pattern Choice (dialog vs menu vs combobox)",
+    withSkill: { pass_rate: 1.0, passed: 6, total: 6 },
+    withoutSkill: { pass_rate: 0.333, passed: 2, total: 6 },
+    assertions: [
+      { text: "Does NOT recommend role=menu for this use case", withSkill: true, withoutSkill: false },
+      { text: "Does NOT recommend dialog for this use case", withSkill: true, withoutSkill: true },
+      { text: "Does NOT recommend combobox for this use case", withSkill: true, withoutSkill: true },
+      { text: "Recommends disclosure button + list of <a> links", withSkill: true, withoutSkill: false },
+      { text: "Explains WHY role=menu is wrong (app actions ≠ nav links)", withSkill: true, withoutSkill: false },
+      { text: "Recommends <a> elements for the team options", withSkill: true, withoutSkill: false },
+    ]
+  },
+  {
+    name: "Complex Stats Table",
+    withSkill: { pass_rate: 0.833, passed: 5, total: 6 },
+    withoutSkill: { pass_rate: 0.667, passed: 4, total: 6 },
+    assertions: [
+      { text: "<caption> element for table description", withSkill: true, withoutSkill: true },
+      { text: "<thead> with <th scope='col'> for week headers", withSkill: true, withoutSkill: true },
+      { text: "<th scope='row'> for player name column", withSkill: true, withoutSkill: true },
+      { text: "Bye week '—' needs accessible text, not just a dash", withSkill: true, withoutSkill: true },
+      { text: "Advises against role=grid (table is read-only)", withSkill: true, withoutSkill: false },
+      { text: "Addresses abbreviated headers (e.g. 'Wk 1' → <abbr>)", withSkill: false, withoutSkill: false },
+    ]
+  }
+];
+
+// ── Bar chart ──
+const ctx = document.getElementById('barChart').getContext('2d');
+new Chart(ctx, {
+  type: 'bar',
+  data: {
+    labels: EVALS.map(e => e.name),
+    datasets: [
+      {
+        label: 'With Skill',
+        data: EVALS.map(e => Math.round(e.withSkill.pass_rate * 100)),
+        backgroundColor: '#1a1a2e',
+        borderRadius: 6,
+        barPercentage: 0.4,
+      },
+      {
+        label: 'Without Skill',
+        data: EVALS.map(e => Math.round(e.withoutSkill.pass_rate * 100)),
+        backgroundColor: '#d1d5db',
+        borderRadius: 6,
+        barPercentage: 0.4,
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y}%`
+        }
+      }
+    },
+    scales: {
+      y: {
+        min: 0,
+        max: 100,
+        ticks: {
+          callback: v => v + '%',
+          font: { size: 11 }
+        },
+        grid: { color: '#f0f0f0' }
+      },
+      x: {
+        grid: { display: false },
+        ticks: { font: { size: 11 } }
+      }
+    }
+  }
+});
+
+// ── Assertion breakdown ──
+const grid = document.getElementById('evalGrid');
+
+EVALS.forEach(ev => {
+  const withPct = Math.round(ev.withSkill.pass_rate * 100);
+  const withoutPct = Math.round(ev.withoutSkill.pass_rate * 100);
+  const delta = withPct - withoutPct;
+
+  const withPillClass = withPct >= 90 ? 'skill' : withPct >= 70 ? 'neutral' : 'no-skill';
+  const withoutPillClass = withoutPct >= 90 ? 'skill' : withoutPct >= 70 ? 'neutral' : 'no-skill';
+
+  const assertionRows = ev.assertions.map(a => {
+    const skillCheck = a.withSkill ? '<span class="check pass">✓</span>' : '<span class="check fail">✗</span>';
+    const noSkillCheck = a.withoutSkill ? '<span class="check pass">✓</span>' : '<span class="check fail">✗</span>';
+    const dotClass = a.withSkill ? 'pass' : 'fail';
+    return `
+      <div class="assertion">
+        <div class="dot ${dotClass}" style="margin-top:4px"></div>
+        <div class="assertion-text">${a.text}</div>
+        ${skillCheck}
+        ${noSkillCheck}
+      </div>`;
+  }).join('');
+
+  const deltaStr = delta > 0 ? `+${delta}%` : `${delta}%`;
+  const deltaColor = delta > 0 ? '#15803d' : delta < 0 ? '#b91c1c' : '#6e6e73';
+
+  grid.innerHTML += `
+    <div class="eval-row">
+      <div class="eval-header">
+        <div class="eval-name">${ev.name}</div>
+        <div class="eval-score">
+          <span class="pill ${withPillClass}">${withPct}% with</span>
+        </div>
+        <div class="eval-score">
+          <span class="pill ${withoutPillClass}">${withoutPct}% without</span>
+          <span style="font-size:11px;font-weight:700;color:${deltaColor};margin-left:4px">${deltaStr}</span>
+        </div>
+      </div>
+      <div class="assertions">
+        <div class="assertion" style="padding-bottom:4px">
+          <div></div>
+          <div></div>
+          <div class="col-head">With</div>
+          <div class="col-head">Without</div>
+        </div>
+        ${assertionRows}
+      </div>
+    </div>`;
+});
+
+// ── Key finding ──
+grid.insertAdjacentHTML('afterend', `
+  <div class="finding">
+    <strong>Key finding:</strong> The biggest gap is the <strong>Pattern Choice eval</strong> (100% vs 33%). Without the skill, Claude recommended <code>role="menu"</code> for navigation links — a common and consequential mistake. The skill's ARIA reference correctly distinguishes app-action menus from disclosure navigation patterns. Both missed the abbreviated-header assertion, indicating a gap to add to the skill.
+  </div>
+`);
+</script>
+</body>
+</html>

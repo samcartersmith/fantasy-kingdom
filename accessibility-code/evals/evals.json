@@ -1,0 +1,23 @@
+{
+  "skill_name": "accessibility-code",
+  "evals": [
+    {
+      "id": 0,
+      "prompt": "I'm building a drag-and-drop roster management feature for my dynasty fantasy app. Users can drag players from a 'Available Players' list and drop them into one of their roster slots. How do I make this fully accessible? I need it to work for keyboard-only users and screen reader users who can't use a mouse.",
+      "expected_output": "Must cover: (1) keyboard alternative — pick up with Space/Enter, move with arrows, drop with Space/Enter, cancel with Escape; (2) aria-grabbed is deprecated — use aria-selected or a different approach; (3) live region announcements when items are picked up, moved, and dropped; (4) visible focus and 'grabbed' state indication; (5) instructions for how to use the keyboard interface.",
+      "files": []
+    },
+    {
+      "id": 1,
+      "prompt": "I'm adding a navigation control to my fantasy app's top nav bar. When a user clicks their team name, they should see options to switch between their teams in different leagues. I'm trying to decide between using a dialog, a menu (role=menu), or a combobox. Which pattern should I use and why? The options are just a flat list of 3–5 team names that navigate to that team's page when selected.",
+      "expected_output": "Should recommend a disclosure button + plain list of links (NOT role=menu, NOT dialog, NOT combobox). A flat list of navigation links is not a menu widget — role=menu is for app menus with actions, not navigation. Dialog is overkill. Combobox is for filtering/selecting values. The right answer is a <button> that toggles a <ul> of <a> links with aria-expanded, possibly role=navigation. Should explain why each wrong option fails.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "I need to build an accessible stats table for my dynasty app. It shows weekly scoring for each player on my roster: rows are players, columns are weeks (Week 1 through Week 17), plus a final column for the season total. Some players have a bye week shown as '—'. The table also has a caption explaining what it shows. How should I mark this up accessibly?",
+      "expected_output": "Must cover: (1) <caption> for the table description; (2) <thead> with <th scope='col'> for week headers; (3) <th scope='row'> for player name column; (4) <tbody> for data rows; (5) handling of '—' bye week — needs aria-label like 'Bye week' not just a dash; (6) avoid using role=grid unless the table is interactive; (7) consider <abbr> or aria-label for abbreviated column headers like 'Wk 1'.",
+      "files": []
+    }
+  ]
+}
