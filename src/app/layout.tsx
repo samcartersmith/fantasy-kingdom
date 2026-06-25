@@ -46,8 +46,8 @@ export default function RootLayout({
             {children}
           </main>
           <SiteFooter />
-          <SpeedInsights />
         </AppProviders>
+        <SpeedInsights />
       </body>
     </html>
   );
