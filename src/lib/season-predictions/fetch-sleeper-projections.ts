@@ -13,6 +13,10 @@ import {
   rawPositionFromProjectionRow,
   skillPositionsFromProjectionRow,
 } from "@/lib/season-predictions/player-positions";
+import {
+  readProjectionRowsFromFs,
+  writeProjectionRowsToFs,
+} from "@/lib/season-predictions/projection-fs-cache";
 
 const DEFAULT_PROJECTION_CONCURRENCY = 4;
 
@@ -166,11 +170,18 @@ async function fetchRawWeekRows(season: string, week: number): Promise<Projectio
   const cached = rawWeekCache.get(cacheKey);
   if (cached) return cached;
 
+  const fromFs = readProjectionRowsFromFs(season, week) as ProjectionRow[] | null;
+  if (fromFs) {
+    rawWeekCache.set(cacheKey, fromFs);
+    return fromFs;
+  }
+
   const res = await fetch(sleeperWeeklyProjectionsUrl(season, week), PROJECTION_FETCH_INIT);
   if (!res.ok) return [];
   const data = await res.json();
   const rows = Array.isArray(data) ? (data as ProjectionRow[]) : [];
   rawWeekCache.set(cacheKey, rows);
+  writeProjectionRowsToFs(season, week, rows);
   return rows;
 }
 

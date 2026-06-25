@@ -61,20 +61,6 @@ function matchupByRoster(rows: SleeperMatchup[]): Map<number, SleeperMatchup> {
   return map;
 }
 
-function weekNeedsProjections(
-  week: number,
-  currentWeek: number,
-  rows: SleeperMatchup[],
-  rosters: SleeperRoster[],
-): boolean {
-  const byRoster = matchupByRoster(rows);
-  for (const roster of rosters) {
-    const row = byRoster.get(roster.roster_id);
-    if (!rosterWeekUsesActuals(week, currentWeek, row)) return true;
-  }
-  return false;
-}
-
 function collectProjectionWeeks(
   matchupsByWeek: Map<number, SleeperMatchup[]>,
   regularSeasonWeeks: number,
@@ -85,7 +71,13 @@ function collectProjectionWeeks(
   for (let week = 1; week <= regularSeasonWeeks; week++) {
     const rows = matchupsByWeek.get(week);
     if (!rows?.length) continue;
-    if (weekNeedsProjections(week, currentWeek, rows, rosters)) weeks.push(week);
+    // Past weeks always use actuals once the season is underway
+    if (currentWeek > 0 && week < currentWeek) continue;
+    const byRoster = matchupByRoster(rows);
+    const needsProjections = rosters.some(
+      (r) => !rosterWeekUsesActuals(week, currentWeek, byRoster.get(r.roster_id)),
+    );
+    if (needsProjections) weeks.push(week);
   }
   return weeks;
 }

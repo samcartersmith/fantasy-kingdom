@@ -43,6 +43,8 @@ type CliArgs = {
   rosterId: number | null;
   auditPositions: boolean;
   json: boolean;
+  bench: boolean;
+  benchRuns: number;
 };
 
 function parseArgs(argv: string[]): CliArgs {
@@ -54,11 +56,14 @@ function parseArgs(argv: string[]): CliArgs {
   let rosterId: number | null = null;
   let auditPositions = false;
   let json = false;
+  let bench = false;
+  let benchRuns = 3;
 
   for (const raw of argv) {
     if (raw === "--compare-modes") compareModes = true;
     else if (raw === "--audit-positions") auditPositions = true;
     else if (raw === "--json") json = true;
+    else if (raw === "--bench") bench = true;
     else if (raw.startsWith("--league_id=")) leagueId = raw.slice("--league_id=".length).trim();
     else if (raw.startsWith("--mode=")) {
       const v = raw.slice("--mode=".length).trim().toLowerCase();
@@ -70,10 +75,13 @@ function parseArgs(argv: string[]): CliArgs {
     else if (raw.startsWith("--roster=")) {
       const n = Number(raw.slice("--roster=".length));
       if (Number.isFinite(n)) rosterId = n;
+    } else if (raw.startsWith("--bench-runs=")) {
+      const n = Number(raw.slice("--bench-runs=".length));
+      if (Number.isFinite(n) && n >= 1) benchRuns = n;
     }
   }
 
-  return { leagueId, compareModes, mode, week, team, rosterId, auditPositions, json };
+  return { leagueId, compareModes, mode, week, team, rosterId, auditPositions, json, bench, benchRuns };
 }
 
 function usage(): never {
@@ -86,7 +94,9 @@ function usage(): never {
     --team=NAME                Filter by team or owner display name (substring)
     --roster=ID                Filter by roster_id
     --audit-positions          List pool players missing skill position hints
-    --json                     Machine-readable summary on stdout`);
+    --json                     Machine-readable summary on stdout
+    --bench                    Time each buildSeasonPredictionsPayload call (run 1 = cold, run 2+ = warm)
+    --bench-runs=N             Number of timed runs (default 3)`);
   process.exit(1);
 }
 
@@ -320,9 +330,42 @@ async function runPositionAudit(leagueId: string, rosterIds: number[]): Promise<
   console.log("");
 }
 
+async function runBench(leagueId: string, mode: "pragmatic" | "optimal", runs: number): Promise<void> {
+  console.log(`\nBenchmark: mode=${mode} league=${leagueId} runs=${runs}`);
+  console.log("Run 1 is cold (network fetch). Subsequent runs use the in-process + fs cache.\n");
+
+  for (let i = 1; i <= runs; i++) {
+    const start = performance.now();
+    const payload = await buildSeasonPredictionsPayload(leagueId, { lineupMode: mode });
+    const elapsed = Math.round(performance.now() - start);
+
+    if (!payload) {
+      console.error(`Run ${i}: failed (null payload — check league_id)`);
+      process.exit(2);
+    }
+
+    const { projectionWeeksFetched, currentWeek, regularSeasonWeeks } = payload.meta;
+    const cacheLabel = i === 1 ? "cold" : projectionWeeksFetched === 0 ? "cache hit" : "partial cache";
+    console.log(
+      `Run ${i}: ${elapsed} ms  |  projectionWeeksFetched=${projectionWeeksFetched}/${regularSeasonWeeks}  |  week=${currentWeek}  |  ${cacheLabel}`,
+    );
+  }
+  console.log("");
+}
+
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
   if (!args.leagueId) usage();
+
+  if (args.bench) {
+    const modes: Array<"pragmatic" | "optimal"> = args.compareModes
+      ? ["pragmatic", "optimal"]
+      : [args.mode];
+    for (const mode of modes) {
+      await runBench(args.leagueId, mode, args.benchRuns);
+    }
+    return;
+  }
 
   const modes: Array<"pragmatic" | "optimal"> = args.compareModes
     ? ["pragmatic", "optimal"]
