@@ -277,36 +277,44 @@ function assignLineupDfsWithPath(
   slotIndex: number,
   used: Set<string>,
   current: LineupAssignment[],
-): { score: number; assignments: LineupAssignment[] } {
+  accumulated: number,
+  best: { score: number; assignments: LineupAssignment[] },
+): void {
   if (slotIndex >= slots.length) {
-    const score = current.reduce(
-      (sum, a) => sum + (a.playerId ? (players.find((p) => p.playerId === a.playerId)?.points ?? 0) : 0),
-      0,
-    );
-    return { score, assignments: current };
+    if (accumulated > best.score) {
+      best.score = accumulated;
+      best.assignments = [...current];
+    }
+    return;
   }
 
-  const slot = slots[slotIndex]!;
-  let best = assignLineupDfsWithPath(slots, players, slotIndex + 1, used, [
-    ...current,
-    { slot, playerId: null },
-  ]);
+  const remaining = slots.length - slotIndex;
+  let cap = 0;
+  let counted = 0;
+  for (const p of players) {
+    if (used.has(p.playerId)) continue;
+    cap += p.points;
+    if (++counted === remaining) break;
+  }
+  if (accumulated + cap <= best.score) return;
 
-  const candidates = players
-    .filter((p) => !used.has(p.playerId) && playerEligibleForSlot(p, slot))
-    .sort((a, b) => b.points - a.points);
+  const slot = slots[slotIndex]!;
+
+  current.push({ slot, playerId: null });
+  assignLineupDfsWithPath(slots, players, slotIndex + 1, used, current, accumulated, best);
+  current.pop();
+
+  const candidates = players.filter(
+    (p) => !used.has(p.playerId) && playerEligibleForSlot(p, slot),
+  );
 
   for (const p of candidates) {
     used.add(p.playerId);
-    const result = assignLineupDfsWithPath(slots, players, slotIndex + 1, used, [
-      ...current,
-      { slot, playerId: p.playerId },
-    ]);
-    if (result.score > best.score) best = result;
+    current.push({ slot, playerId: p.playerId });
+    assignLineupDfsWithPath(slots, players, slotIndex + 1, used, current, accumulated + p.points, best);
+    current.pop();
     used.delete(p.playerId);
   }
-
-  return best;
 }
 
 /** Max-projection legal starting lineup assignments (same order as `startingSlots`). */
@@ -331,14 +339,14 @@ export function optimizeProjectedLineupAssignments(
 
   const indexed = startingSlots.map((slot, index) => ({ slot, index }));
   const ordered = [...indexed].sort((a, b) => slotSortKey(a.slot) - slotSortKey(b.slot));
+  const sortedPlayers = [...players].sort((a, b) => b.points - a.points);
 
-  const { assignments: orderedAssignments } = assignLineupDfsWithPath(
-    ordered.map((o) => o.slot),
-    players,
-    0,
-    new Set(),
-    [],
-  );
+  const best = {
+    score: 0,
+    assignments: ordered.map((o) => ({ slot: o.slot, playerId: null as string | null })),
+  };
+  assignLineupDfsWithPath(ordered.map((o) => o.slot), sortedPlayers, 0, new Set(), [], 0, best);
+  const orderedAssignments = best.assignments;
 
   const result: LineupAssignment[] = startingSlots.map((slot) => ({ slot, playerId: null }));
   for (let i = 0; i < ordered.length; i++) {
@@ -485,24 +493,36 @@ function assignLineupDfs(
   players: LineupPlayer[],
   slotIndex: number,
   used: Set<string>,
-): number {
-  if (slotIndex >= slots.length) return 0;
+  accumulated: number,
+  best: { score: number },
+): void {
+  if (slotIndex >= slots.length) {
+    if (accumulated > best.score) best.score = accumulated;
+    return;
+  }
+
+  const remaining = slots.length - slotIndex;
+  let cap = 0;
+  let counted = 0;
+  for (const p of players) {
+    if (used.has(p.playerId)) continue;
+    cap += p.points;
+    if (++counted === remaining) break;
+  }
+  if (accumulated + cap <= best.score) return;
 
   const slot = slots[slotIndex]!;
-  let best = assignLineupDfs(slots, players, slotIndex + 1, used);
+  assignLineupDfs(slots, players, slotIndex + 1, used, accumulated, best);
 
-  const candidates = players
-    .filter((p) => !used.has(p.playerId) && playerEligibleForSlot(p, slot))
-    .sort((a, b) => b.points - a.points);
+  const candidates = players.filter(
+    (p) => !used.has(p.playerId) && playerEligibleForSlot(p, slot),
+  );
 
   for (const p of candidates) {
     used.add(p.playerId);
-    const total = p.points + assignLineupDfs(slots, players, slotIndex + 1, used);
-    if (total > best) best = total;
+    assignLineupDfs(slots, players, slotIndex + 1, used, accumulated + p.points, best);
     used.delete(p.playerId);
   }
-
-  return best;
 }
 
 /**
@@ -531,6 +551,8 @@ export function optimizeProjectedLineupScore(
   const orderedSlots = [...startingSlots].sort(
     (a, b) => slotSortKey(a) - slotSortKey(b),
   );
-
-  return assignLineupDfs(orderedSlots, players, 0, new Set());
+  const sortedPlayers = [...players].sort((a, b) => b.points - a.points);
+  const best = { score: 0 };
+  assignLineupDfs(orderedSlots, sortedPlayers, 0, new Set(), 0, best);
+  return best.score;
 }
